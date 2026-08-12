@@ -1,0 +1,144 @@
+DROP DATABASE IF EXISTS `hmall`;
+CREATE DATABASE `hmall` DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+USE `hmall`;
+
+CREATE TABLE `user` (
+  `id` BIGINT(20) NOT NULL AUTO_INCREMENT,
+  `username` VARCHAR(100) DEFAULT NULL,
+  `password` VARCHAR(128) NOT NULL,
+  `phone` VARCHAR(20) DEFAULT NULL,
+  `create_time` DATETIME DEFAULT CURRENT_TIMESTAMP,
+  `update_time` DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  `status` TINYINT(1) DEFAULT 1,
+  `balance` INT(11) DEFAULT 0,
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uk_username` (`username`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+CREATE TABLE `item` (
+  `id` BIGINT(20) NOT NULL AUTO_INCREMENT,
+  `name` VARCHAR(200) NOT NULL,
+  `price` INT(11) NOT NULL,
+  `stock` INT(11) NOT NULL DEFAULT 0,
+  `image` VARCHAR(500) DEFAULT NULL,
+  `category` VARCHAR(50) DEFAULT NULL,
+  `brand` VARCHAR(50) DEFAULT NULL,
+  `spec` VARCHAR(200) DEFAULT NULL,
+  `sold` INT(11) DEFAULT 0,
+  `comment_count` INT(11) DEFAULT 0,
+  `isAD` TINYINT(1) DEFAULT 0,
+  `status` TINYINT(1) DEFAULT 1,
+  `create_time` DATETIME DEFAULT CURRENT_TIMESTAMP,
+  `update_time` DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  `creater` BIGINT(20) DEFAULT NULL,
+  `updater` BIGINT(20) DEFAULT NULL,
+  PRIMARY KEY (`id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+CREATE TABLE `order` (
+  `id` BIGINT(20) NOT NULL,
+  `total_fee` INT(11) NOT NULL,
+  `payment_type` TINYINT(1) DEFAULT 1,
+  `user_id` BIGINT(20) NOT NULL,
+  `status` TINYINT(1) DEFAULT 1,
+  `create_time` DATETIME DEFAULT CURRENT_TIMESTAMP,
+  `pay_time` DATETIME DEFAULT NULL,
+  `consign_time` DATETIME DEFAULT NULL,
+  `end_time` DATETIME DEFAULT NULL,
+  `close_time` DATETIME DEFAULT NULL,
+  `comment_time` DATETIME DEFAULT NULL,
+  `update_time` DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+CREATE TABLE `order_detail` (
+  `id` BIGINT(20) NOT NULL AUTO_INCREMENT,
+  `order_id` BIGINT(20) NOT NULL,
+  `item_id` BIGINT(20) NOT NULL,
+  `num` INT(11) NOT NULL,
+  `name` VARCHAR(200) NOT NULL,
+  `spec` VARCHAR(200) DEFAULT NULL,
+  `price` INT(11) NOT NULL,
+  `image` VARCHAR(500) DEFAULT NULL,
+  `create_time` DATETIME DEFAULT CURRENT_TIMESTAMP,
+  `update_time` DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+CREATE TABLE `cart` (
+  `id` BIGINT(20) NOT NULL AUTO_INCREMENT,
+  `user_id` BIGINT(20) NOT NULL,
+  `item_id` BIGINT(20) NOT NULL,
+  `num` INT(11) NOT NULL DEFAULT 1,
+  `name` VARCHAR(200) NOT NULL,
+  `spec` VARCHAR(200) DEFAULT NULL,
+  `price` INT(11) NOT NULL,
+  `image` VARCHAR(500) DEFAULT NULL,
+  `create_time` DATETIME DEFAULT CURRENT_TIMESTAMP,
+  `update_time` DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+CREATE TABLE `address` (
+  `id` BIGINT(20) NOT NULL AUTO_INCREMENT,
+  `user_id` BIGINT(20) NOT NULL,
+  `province` VARCHAR(30) DEFAULT NULL,
+  `city` VARCHAR(30) DEFAULT NULL,
+  `town` VARCHAR(30) DEFAULT NULL,
+  `mobile` VARCHAR(20) NOT NULL,
+  `street` VARCHAR(200) DEFAULT NULL,
+  `contact` VARCHAR(50) DEFAULT NULL,
+  `is_default` TINYINT(1) DEFAULT 0,
+  `notes` VARCHAR(200) DEFAULT NULL,
+  `deleted` TINYINT(1) DEFAULT 0,
+  `create_time` DATETIME DEFAULT CURRENT_TIMESTAMP,
+  `update_time` DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+CREATE TABLE `order_logistics` (
+  `id` BIGINT(20) NOT NULL AUTO_INCREMENT,
+  `order_id` BIGINT(20) NOT NULL,
+  `logistics_number` VARCHAR(50) DEFAULT NULL,
+  `logistics_company` VARCHAR(50) DEFAULT NULL,
+  `contact` VARCHAR(50) DEFAULT NULL,
+  `mobile` VARCHAR(20) DEFAULT NULL,
+  `province` VARCHAR(30) DEFAULT NULL,
+  `city` VARCHAR(30) DEFAULT NULL,
+  `town` VARCHAR(30) DEFAULT NULL,
+  `street` VARCHAR(200) DEFAULT NULL,
+  `create_time` DATETIME DEFAULT CURRENT_TIMESTAMP,
+  `update_time` DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uk_order_id` (`order_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+CREATE TABLE `pay_order` (
+  `id` BIGINT(20) NOT NULL AUTO_INCREMENT,
+  `biz_order_no` BIGINT(20) NOT NULL,
+  `pay_order_no` BIGINT(20) NOT NULL,
+  `biz_user_id` BIGINT(20) NOT NULL,
+  `payment_channel` VARCHAR(20) DEFAULT NULL,
+  `amount` INT(11) NOT NULL,
+  `pay_type` TINYINT(1) DEFAULT 1,
+  `status` TINYINT(1) DEFAULT 1,
+  `pay_success_time` DATETIME DEFAULT NULL,
+  `pay_order_expire_time` DATETIME DEFAULT NULL,
+  `pay_channel_extra` VARCHAR(500) DEFAULT NULL,
+  `create_time` DATETIME DEFAULT CURRENT_TIMESTAMP,
+  `update_time` DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uk_biz_order_no` (`biz_order_no`),
+  UNIQUE KEY `uk_pay_order_no` (`pay_order_no`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+INSERT INTO `user` VALUES 
+(1, 'admin', '$2a$10$pGXGsLU2KqgEBMGN6d3qvO2jFCu0R1zKDUvCakyQKGZS96tWyR6gW', '13800138000', NOW(), NOW(), 1, 100000),
+(2, 'user1', '$2a$10$pGXGsLU2KqgEBMGN6d3qvO2jFCu0R1zKDUvCakyQKGZS96tWyR6gW', '13800138001', NOW(), NOW(), 1, 50000);
+
+INSERT INTO `item` VALUES 
+(1, 'iPhone 14 Pro 256GB', 799900, 100, 'https://example.com/iphone14.jpg', 'phone', 'Apple', '256GB', 520, 128, 1, 1, NOW(), NOW(), 1, 1),
+(2, 'Huawei Mate 50 Pro', 689900, 200, 'https://example.com/mate50.jpg', 'phone', 'Huawei', '256GB', 380, 95, 0, 1, NOW(), NOW(), 1, 1),
+(3, 'Xiaomi 13 Pro', 499900, 150, 'https://example.com/mi13.jpg', 'phone', 'Xiaomi', '256GB', 680, 210, 0, 1, NOW(), NOW(), 1, 1);
+
+SELECT 'Database initialized successfully' AS message;

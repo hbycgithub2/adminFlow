@@ -1,0 +1,592 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Edge TTS 测试页面 - adminFlow</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+        
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 16px;
+            padding: 40px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+        }
+        
+        h1 {
+            color: #333;
+            margin-bottom: 10px;
+            font-size: 32px;
+        }
+        
+        .subtitle {
+            color: #666;
+            margin-bottom: 40px;
+            font-size: 14px;
+        }
+        
+        .section {
+            margin-bottom: 40px;
+            padding-bottom: 30px;
+            border-bottom: 2px solid #f0f0f0;
+        }
+        
+        .section:last-child {
+            border-bottom: none;
+        }
+        
+        h2 {
+            color: #667eea;
+            font-size: 20px;
+            margin-bottom: 20px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        
+        .voice-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+            gap: 15px;
+            margin-top: 20px;
+        }
+        
+        .voice-card {
+            border: 2px solid #e0e0e0;
+            border-radius: 12px;
+            padding: 20px;
+            cursor: pointer;
+            transition: all 0.3s;
+            background: white;
+        }
+        
+        .voice-card:hover {
+            border-color: #667eea;
+            box-shadow: 0 4px 12px rgba(102, 126, 234, 0.15);
+            transform: translateY(-2px);
+        }
+        
+        .voice-card.selected {
+            border-color: #667eea;
+            background: linear-gradient(135deg, #667eea15 0%, #764ba215 100%);
+        }
+        
+        .voice-name {
+            font-size: 18px;
+            font-weight: bold;
+            color: #333;
+            margin-bottom: 8px;
+        }
+        
+        .voice-meta {
+            font-size: 13px;
+            color: #666;
+            margin-bottom: 5px;
+        }
+        
+        .voice-scene {
+            font-size: 12px;
+            color: #999;
+            background: #f5f5f5;
+            padding: 4px 8px;
+            border-radius: 4px;
+            display: inline-block;
+            margin-top: 8px;
+        }
+        
+        textarea {
+            width: 100%;
+            padding: 15px;
+            border: 2px solid #e0e0e0;
+            border-radius: 8px;
+            font-size: 14px;
+            resize: vertical;
+            font-family: inherit;
+            transition: border-color 0.3s;
+        }
+        
+        textarea:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+        
+        .controls {
+            display: flex;
+            gap: 10px;
+            margin-top: 15px;
+            flex-wrap: wrap;
+        }
+        
+        button {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: 500;
+            transition: all 0.3s;
+            box-shadow: 0 4px 12px rgba(102, 126, 234, 0.3);
+        }
+        
+        button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 16px rgba(102, 126, 234, 0.4);
+        }
+        
+        button:active {
+            transform: translateY(0);
+        }
+        
+        button.secondary {
+            background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+        }
+        
+        button.success {
+            background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);
+        }
+        
+        .status {
+            margin-top: 15px;
+            padding: 15px;
+            border-radius: 8px;
+            display: none;
+            animation: slideIn 0.3s;
+        }
+        
+        @keyframes slideIn {
+            from { opacity: 0; transform: translateY(-10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        
+        .status.info {
+            background: #e3f2fd;
+            color: #1976d2;
+            border-left: 4px solid #1976d2;
+        }
+        
+        .status.success {
+            background: #e8f5e9;
+            color: #2e7d32;
+            border-left: 4px solid #2e7d32;
+        }
+        
+        .status.error {
+            background: #ffebee;
+            color: #c62828;
+            border-left: 4px solid #c62828;
+        }
+        
+        .badge {
+            display: inline-block;
+            padding: 4px 12px;
+            border-radius: 12px;
+            font-size: 12px;
+            font-weight: 500;
+            margin-left: 10px;
+        }
+        
+        .badge.female {
+            background: #fce4ec;
+            color: #c2185b;
+        }
+        
+        .badge.male {
+            background: #e3f2fd;
+            color: #1976d2;
+        }
+        
+        /* 折叠面板样式 */
+        .voice-category {
+            margin-bottom: 15px;
+            border: 2px solid #e0e0e0;
+            border-radius: 12px;
+            overflow: hidden;
+            transition: all 0.3s;
+        }
+        
+        .category-header {
+            padding: 15px 20px;
+            background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
+            cursor: pointer;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            transition: all 0.3s;
+            font-weight: 600;
+            font-size: 16px;
+            user-select: none;
+        }
+        
+        .category-header:hover {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+        }
+        
+        .category-header:active {
+            transform: scale(0.98);
+        }
+        
+        .toggle-icon {
+            transition: transform 0.3s;
+            font-size: 14px;
+            font-weight: bold;
+        }
+        
+        .toggle-icon.rotate {
+            transform: rotate(180deg);
+        }
+        
+        .voice-grid-wrapper {
+            max-height: 0;
+            overflow: hidden;
+            transition: max-height 0.4s ease-out;
+        }
+        
+        .voice-grid-wrapper.expanded {
+            max-height: 2000px;
+            transition: max-height 0.4s ease-in;
+        }
+        
+        .voice-grid-wrapper .voice-grid {
+            padding: 20px;
+            background: white;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🎤 Edge TTS 测试页面</h1>
+        <div class="subtitle">基于 adminFlow (Spring Boot 2.7.12) | 完整的 13 种中文音色</div>
+        
+        <!-- 健康检查 -->
+        <div class="section">
+            <h2>📊 系统状态</h2>
+            <button onclick="checkHealth()">🔍 检查 Edge TTS 状态</button>
+            <div id="healthStatus" class="status"></div>
+        </div>
+        
+        <!-- 播放测试（移到前面）-->
+        <div class="section">
+            <h2>▶️ 语音测试</h2>
+            <textarea id="textInput" rows="4" placeholder="输入要播放的文本...">你好，我是晓晓，很高兴为你服务。这是Edge TTS的中文语音合成测试。</textarea>
+            <div class="controls">
+                <button onclick="playText()">🎤 生成并播放</button>
+                <button onclick="stopAudio()" class="secondary">⏹️ 停止</button>
+                <button onclick="downloadAudio()" class="success">💾 下载音频</button>
+            </div>
+            <div id="playStatus" class="status"></div>
+        </div>
+        
+        <!-- 音色列表（折叠面板）-->
+        <div class="section">
+            <h2>🎵 音色列表（点击展开/折叠）</h2>
+            
+            <!-- 中文音色展示（普通话）-->
+            <div class="voice-category">
+                <div class="category-header" onclick="toggleCategory('zhCN')">
+                    <span>🇨🇳 CN 普通话音色（8种）</span>
+                    <span class="toggle-icon" id="zhCN-icon">▼</span>
+                </div>
+                <div class="voice-grid-wrapper" id="zhCN-wrapper">
+                    <div class="voice-grid" id="zhCNVoices"></div>
+                </div>
+            </div>
+            
+            <!-- 粤语音色 -->
+            <div class="voice-category">
+                <div class="category-header" onclick="toggleCategory('zhHK')">
+                    <span>🇭🇰 HK 粤语音色（3种）</span>
+                    <span class="toggle-icon" id="zhHK-icon">▼</span>
+                </div>
+                <div class="voice-grid-wrapper" id="zhHK-wrapper">
+                    <div class="voice-grid" id="zhHKVoices"></div>
+                </div>
+            </div>
+            
+            <!-- 台湾国语音色 -->
+            <div class="voice-category">
+                <div class="category-header" onclick="toggleCategory('zhTW')">
+                    <span>🇹🇼 TW 台湾国语音色（3种）</span>
+                    <span class="toggle-icon" id="zhTW-icon">▼</span>
+                </div>
+                <div class="voice-grid-wrapper" id="zhTW-wrapper">
+                    <div class="voice-grid" id="zhTWVoices"></div>
+                </div>
+            </div>
+            
+            <!-- 英文音色 -->
+            <div class="voice-category">
+                <div class="category-header" onclick="toggleCategory('enUS')">
+                    <span>🇺🇸 US 英文音色（推荐5种）</span>
+                    <span class="toggle-icon" id="enUS-icon">▼</span>
+                </div>
+                <div class="voice-grid-wrapper" id="enUS-wrapper">
+                    <div class="voice-grid" id="enUSVoices"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <script>
+        let currentVoice = 'zh-CN-XiaoxiaoNeural';
+        let currentAudio = null;
+        let allVoices = {};
+        
+        // 页面加载完成后初始化
+        window.addEventListener('load', () => {
+            loadVoices();
+            checkHealth();
+        });
+        
+        // 加载音色列表
+        async function loadVoices() {
+            try {
+                const response = await fetch('/api/tts/voices');
+                const result = await response.json();
+                
+                if (result.success) {
+                    allVoices = result.data;
+                    renderVoices();
+                }
+            } catch (error) {
+                console.error('加载音色失败:', error);
+            }
+        }
+        
+        // 渲染音色卡片
+        function renderVoices() {
+            renderVoiceGroup('zhCNVoices', allVoices['zh-CN'] || []);
+            renderVoiceGroup('zhHKVoices', allVoices['zh-HK'] || []);
+            renderVoiceGroup('zhTWVoices', allVoices['zh-TW'] || []);
+            renderVoiceGroup('enUSVoices', allVoices['en-US'] || []);
+        }
+        
+        function renderVoiceGroup(containerId, voices) {
+            const container = document.getElementById(containerId);
+            container.innerHTML = '';
+            
+            voices.forEach(voice => {
+                const card = document.createElement('div');
+                card.className = 'voice-card';
+                if (voice.code === currentVoice) {
+                    card.classList.add('selected');
+                }
+                
+                card.innerHTML = `
+                    <div class="voice-name">
+                        ${voice.name}
+                        <span class="badge ${voice.gender === '女' ? 'female' : 'male'}">
+                            ${voice.gender === '女' ? '👩' : '👨'} ${voice.gender}声
+                        </span>
+                    </div>
+                    <div class="voice-meta">🎵 ${voice.characteristic}</div>
+                    <div class="voice-scene">📝 适用: ${voice.scene}</div>
+                `;
+                
+                card.onclick = () => selectVoice(voice.code);
+                container.appendChild(card);
+            });
+        }
+        
+        // 选择音色
+        function selectVoice(voiceCode) {
+            currentVoice = voiceCode;
+            
+            // 更新选中状态
+            document.querySelectorAll('.voice-card').forEach(card => {
+                card.classList.remove('selected');
+            });
+            event.currentTarget.classList.add('selected');
+            
+            // 试听
+            const sampleTexts = {
+                'zh-CN': '你好，我是{name}，很高兴为你服务。',
+                'zh-HK': '你好，我係{name}，好開心為你服務。',
+                'zh-TW': '你好，我是{name}，很高興為你服務。',
+                'en-US': 'Hello, I am {name}. Nice to meet you.'
+            };
+            
+            const locale = voiceCode.split('-').slice(0, 2).join('-');
+            const sampleText = sampleTexts[locale] || sampleTexts['en-US'];
+            
+            playText(sampleText);
+        }
+        
+        // 播放文本
+        async function playText(text) {
+            const textToPlay = text || document.getElementById('textInput').value;
+            
+            if (!textToPlay.trim()) {
+                showStatus('playStatus', '⚠️ 请输入文本', 'error');
+                return;
+            }
+            
+            showStatus('playStatus', '🎤 正在生成语音...', 'info');
+            
+            try {
+                const response = await fetch('/api/tts/generate', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        text: textToPlay,
+                        voice: currentVoice,
+                        rate: '+0%',
+                        pitch: '+0Hz'
+                    })
+                });
+                
+                if (!response.ok) {
+                    throw new Error('生成失败');
+                }
+                
+                const audioBlob = await response.blob();
+                const audioUrl = URL.createObjectURL(audioBlob);
+                
+                // 停止之前的音频
+                if (currentAudio) {
+                    currentAudio.pause();
+                }
+                
+                // 播放新音频
+                currentAudio = new Audio(audioUrl);
+                currentAudio.play();
+                
+                showStatus('playStatus', '✅ 播放中...', 'success');
+                
+                currentAudio.onended = () => {
+                    showStatus('playStatus', '✅ 播放完成', 'success');
+                    URL.revokeObjectURL(audioUrl);
+                };
+                
+            } catch (error) {
+                console.error('播放失败:', error);
+                showStatus('playStatus', '❌ 播放失败: ' + error.message, 'error');
+            }
+        }
+        
+        // 停止播放
+        function stopAudio() {
+            if (currentAudio) {
+                currentAudio.pause();
+                currentAudio.currentTime = 0;
+                showStatus('playStatus', '⏹️ 已停止', 'info');
+            }
+        }
+        
+        // 下载音频
+        async function downloadAudio() {
+            const text = document.getElementById('textInput').value;
+            
+            if (!text.trim()) {
+                showStatus('playStatus', '⚠️ 请输入文本', 'error');
+                return;
+            }
+            
+            showStatus('playStatus', '💾 正在生成音频文件...', 'info');
+            
+            try {
+                const response = await fetch('/api/tts/generate', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        text: text,
+                        voice: currentVoice,
+                        rate: '+0%',
+                        pitch: '+0Hz'
+                    })
+                });
+                
+                if (!response.ok) {
+                    throw new Error('生成失败');
+                }
+                
+                const audioBlob = await response.blob();
+                const url = URL.createObjectURL(audioBlob);
+                
+                // 下载文件
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = `speech_${Date.now()}.mp3`;
+                a.click();
+                
+                URL.revokeObjectURL(url);
+                
+                showStatus('playStatus', '✅ 下载成功', 'success');
+                
+            } catch (error) {
+                console.error('下载失败:', error);
+                showStatus('playStatus', '❌ 下载失败: ' + error.message, 'error');
+            }
+        }
+        
+        // 健康检查
+        async function checkHealth() {
+            try {
+                const response = await fetch('/api/tts/health');
+                const result = await response.json();
+                
+                if (result.installed) {
+                    showStatus('healthStatus', `✅ Edge TTS 已安装 (版本: ${result.version})`, 'success');
+                } else {
+                    showStatus('healthStatus', `❌ Edge TTS 未安装 - 请运行 install-edge-tts.bat`, 'error');
+                }
+                
+            } catch (error) {
+                showStatus('healthStatus', '❌ 无法连接到后端服务', 'error');
+            }
+        }
+        
+        // 显示状态消息
+        function showStatus(id, message, type) {
+            const statusEl = document.getElementById(id);
+            statusEl.textContent = message;
+            statusEl.className = `status ${type}`;
+            statusEl.style.display = 'block';
+            
+            if (type !== 'info') {
+                setTimeout(() => {
+                    statusEl.style.display = 'none';
+                }, 5000);
+            }
+        }
+        
+        // 折叠/展开分类
+        function toggleCategory(categoryId) {
+            const wrapper = document.getElementById(categoryId + '-wrapper');
+            const icon = document.getElementById(categoryId + '-icon');
+            
+            if (wrapper.classList.contains('expanded')) {
+                // 折叠
+                wrapper.classList.remove('expanded');
+                icon.textContent = '▼';
+                icon.classList.remove('rotate');
+            } else {
+                // 展开
+                wrapper.classList.add('expanded');
+                icon.textContent = '▲';
+                icon.classList.add('rotate');
+            }
+        }
+    </script>
+</body>
+</html>

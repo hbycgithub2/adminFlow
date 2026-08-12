@@ -1,0 +1,81 @@
+server:
+  port: 8080
+spring:
+  redis:
+    host: 127.0.0.1
+    port: 6379
+    password: 123456
+    lettuce:
+      pool:
+        max-active: 8
+        max-idle: 8
+        min-idle: 0
+        max-wait: 200ms
+  application:
+    name: hm-service
+  profiles:
+    active: dev
+  datasource:
+    url: jdbc:mysql://127.0.0.1:3306/hmall?useUnicode=true&characterEncoding=UTF-8&autoReconnect=true&serverTimezone=Asia/Shanghai
+    username: root
+    password: root
+  cloud:
+    sentinel:
+      transport:
+        dashboard: localhost:8088 # sentinel的控制台地址
+      http-method-specify: true #是否设置请求方式作为资源名称
+mybatis-plus:
+  configuration:
+    default-enum-type-handler: com.baomidou.mybatisplus.core.handlers.MybatisEnumTypeHandler
+  global-config:
+    db-config:
+      update-strategy: not_null
+      id-type: auto
+logging:
+  level:
+    com.hmall: debug
+  pattern:
+    dateformat: HH:mm:ss:SSS
+  file:
+    path: "logs/${spring.application.name}"
+knife4j:
+  enable: true
+  openapi:
+    title: 黑马商城接口文档
+    description: "黑马商城接口文档"
+    email: zhanghuyi@itcast.cn
+    concat: 虎哥
+    url: https://www.itcast.cn
+    version: v1.0.0
+    group:
+      default:
+        group-name: default
+        api-rule: package
+        api-rule-resources:
+          - com.hmall.controller
+
+# Edge TTS 配置
+edge-tts:
+  command: py -m edge_tts  # edge-tts 命令路径（使用 Python 模块方式）
+  timeout: 30              # 超时时间（秒）
+  temp-dir: temp           # 临时文件目录
+hm:
+  jwt:
+    location: classpath:hmall.jks
+    alias: hmall
+    password: hmall123
+    tokenTTL: 30000m
+  auth:
+    excludePaths:
+      - /search/**
+      - /users/login
+      - /items/**
+      - /hi
+      - /api/edge-tts/**      # Edge TTS 接口（旧，保留兼容）
+      - /api/tts/**           # TTS 模块接口（新）
+      - /edge-tts-test.html   # Edge TTS 测试页面
+      - /tts-test.html        # TTS 测试页面（新）
+      - /**/*.html            # 所有静态 HTML 页面
+      - /**/*.js              # 所有 JS 文件
+      - /**/*.css             # 所有 CSS 文件
+# keytool -genkeypair -alias hmall -keyalg RSA -keypass hmall123 -keystore hmall.jks -storepass hmall123
