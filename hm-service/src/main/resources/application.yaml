@@ -58,7 +58,7 @@ knife4j:
 edge-tts:
   command: py -m edge_tts  # edge-tts 命令路径（使用 Python 模块方式）
   timeout: 30              # 超时时间（秒）
-  temp-dir: temp           # 临时文件目录
+  temp-dir: d:/code/adminFlow/temp  # 临时文件目录（使用绝对路径）
 hm:
   jwt:
     location: classpath:hmall.jks

@@ -57,12 +57,19 @@ public class EdgeTTSCoreService {
                 System.currentTimeMillis(),
                 UUID.randomUUID().toString().substring(0, 8));
         Path tempFilePath = tempDirPath.resolve(tempFileName);
+        Path tempTextFilePath = null;  // 临时文本文件路径
 
         try {
             // 构建命令
             List<String> command = buildCommand(voice, rate, pitch, text, tempFilePath);
             
-            log.debug("🎤 [Edge TTS Core] 执行命令: {}", String.join(" ", command));
+            // 记录临时文本文件路径（用于清理）
+            if (text.length() > 200) {
+                tempTextFilePath = tempDirPath.resolve(tempFileName.replace(".mp3", ".txt"));
+            }
+            
+            log.info("🎤 [Edge TTS Core] 执行命令: {}", String.join(" ", command));
+            log.info("🎤 [Edge TTS Core] 输出文件: {}", tempFilePath.toString());
 
             // 执行命令
             ProcessBuilder processBuilder = new ProcessBuilder(command);
@@ -70,34 +77,55 @@ public class EdgeTTSCoreService {
             
             Process process = processBuilder.start();
 
-            // 读取输出（避免进程阻塞）
-            StringBuilder output = new StringBuilder();
-            try (BufferedReader reader = new BufferedReader(
-                    new InputStreamReader(process.getInputStream()))) {
-                String line;
-                while ((line = reader.readLine()) != null) {
-                    output.append(line).append("\n");
+            // 使用单独的线程读取stdout（避免阻塞）
+            Thread outputReaderThread = new Thread(() -> {
+                try (InputStream is = process.getInputStream()) {
+                    byte[] buffer = new byte[8192];
+                    while (is.read(buffer) != -1) {
+                        // 丢弃数据（必须读取，否则进程会阻塞）
+                    }
+                } catch (IOException e) {
+                    log.debug("输出流读取结束: {}", e.getMessage());
                 }
-            }
+            });
+            outputReaderThread.setDaemon(true);
+            outputReaderThread.start();
 
             // 等待进程完成
             boolean finished = process.waitFor(properties.getTimeout(), TimeUnit.SECONDS);
             
             if (!finished) {
                 process.destroyForcibly();
+                log.error("❌ [Edge TTS Core] 超时: timeout={}秒", properties.getTimeout());
                 throw new TTSException(TTSErrorCode.TIMEOUT);
             }
 
             int exitCode = process.exitValue();
+            log.info("✅ [Edge TTS Core] 进程退出: exitCode={}", exitCode);
+            
             if (exitCode != 0) {
-                log.error("❌ [Edge TTS Core] 执行失败: exitCode={}, output={}", exitCode, output);
-                throw new TTSException(TTSErrorCode.EXECUTION_FAILED, "Edge TTS 执行失败: " + output.toString());
+                log.error("❌ [Edge TTS Core] 执行失败: exitCode={}", exitCode);
+                throw new TTSException(TTSErrorCode.EXECUTION_FAILED, "Edge TTS 执行失败，退出码: " + exitCode);
             }
 
-            // 读取生成的音频文件
-            if (!Files.exists(tempFilePath)) {
-                throw new TTSException(TTSErrorCode.EXECUTION_FAILED, "音频文件未生成");
+            // 等待文件生成（最多等待5秒，每100ms检查一次）
+            int maxRetries = 50;
+            int retryCount = 0;
+            while (!Files.exists(tempFilePath) && retryCount < maxRetries) {
+                Thread.sleep(100);
+                retryCount++;
             }
+
+            // 检查文件是否生成
+            if (!Files.exists(tempFilePath)) {
+                log.error("❌ [Edge TTS Core] 音频文件未生成: {}", tempFilePath);
+                log.error("❌ [Edge TTS Core] 临时目录内容: {}", 
+                    Arrays.toString(tempDirPath.toFile().listFiles()));
+                log.error("❌ [Edge TTS Core] 等待时间: {}ms", retryCount * 100);
+                throw new TTSException(TTSErrorCode.EXECUTION_FAILED, "音频文件未生成: " + tempFilePath);
+            }
+            
+            log.info("✅ [Edge TTS Core] 文件生成成功，等待时间: {}ms", retryCount * 100);
 
             byte[] audioData = Files.readAllBytes(tempFilePath);
             
@@ -115,6 +143,10 @@ public class EdgeTTSCoreService {
             try {
                 if (Files.exists(tempFilePath)) {
                     Files.delete(tempFilePath);
+                }
+                // 清理临时文本文件
+                if (tempTextFilePath != null && Files.exists(tempTextFilePath)) {
+                    Files.delete(tempTextFilePath);
                 }
             } catch (IOException e) {
                 log.warn("⚠️ [Edge TTS Core] 清理临时文件失败: {}", e.getMessage());
@@ -232,7 +264,7 @@ public class EdgeTTSCoreService {
     /**
      * 构建命令
      */
-    private List<String> buildCommand(String voice, String rate, String pitch, String text, Path outputPath) {
+    private List<String> buildCommand(String voice, String rate, String pitch, String text, Path outputPath) throws IOException {
         List<String> command = new ArrayList<>();
         
         // 处理命令（支持 "py -m edge_tts" 这种多参数格式）
@@ -247,8 +279,23 @@ public class EdgeTTSCoreService {
         command.add(rate);
         command.add("--pitch");
         command.add(pitch);
-        command.add("--text");
-        command.add(text);
+        
+        // 对于长文本（>200字符），使用临时文件传递，避免命令行长度限制
+        if (text.length() > 200) {
+            // 创建临时文本文件
+            Path textFilePath = outputPath.getParent().resolve(
+                outputPath.getFileName().toString().replace(".mp3", ".txt"));
+            Files.write(textFilePath, text.getBytes("UTF-8"));
+            
+            command.add("--file");
+            command.add(textFilePath.toString());
+            
+            log.debug("📝 [Edge TTS Core] 使用文件传递文本: {}", textFilePath);
+        } else {
+            command.add("--text");
+            command.add(text);
+        }
+        
         command.add("--write-media");
         command.add(outputPath.toString());
         
