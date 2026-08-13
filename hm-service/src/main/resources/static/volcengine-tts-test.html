@@ -1,0 +1,430 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>火山引擎 TTS 测试页面</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 900px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 20px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+            overflow: hidden;
+        }
+
+        .header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 30px;
+            text-align: center;
+        }
+
+        .header h1 {
+            font-size: 32px;
+            margin-bottom: 10px;
+        }
+
+        .header p {
+            font-size: 16px;
+            opacity: 0.9;
+        }
+
+        .content {
+            padding: 30px;
+        }
+
+        .section {
+            margin-bottom: 30px;
+        }
+
+        .section-title {
+            font-size: 20px;
+            color: #333;
+            margin-bottom: 15px;
+            padding-bottom: 10px;
+            border-bottom: 2px solid #667eea;
+        }
+
+        .form-group {
+            margin-bottom: 20px;
+        }
+
+        label {
+            display: block;
+            font-weight: 600;
+            color: #555;
+            margin-bottom: 8px;
+        }
+
+        textarea {
+            width: 100%;
+            padding: 12px;
+            border: 2px solid #e0e0e0;
+            border-radius: 8px;
+            font-size: 14px;
+            font-family: inherit;
+            resize: vertical;
+            min-height: 120px;
+            transition: border-color 0.3s;
+        }
+
+        textarea:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+
+        select, input[type="number"] {
+            width: 100%;
+            padding: 12px;
+            border: 2px solid #e0e0e0;
+            border-radius: 8px;
+            font-size: 14px;
+            transition: border-color 0.3s;
+        }
+
+        select:focus, input[type="number"]:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+
+        .button-group {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+        }
+
+        button {
+            flex: 1;
+            min-width: 150px;
+            padding: 14px 28px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            border-radius: 8px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s;
+            box-shadow: 0 4px 15px rgba(102, 126, 234, 0.4);
+        }
+
+        button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(102, 126, 234, 0.6);
+        }
+
+        button:active {
+            transform: translateY(0);
+        }
+
+        button:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+            box-shadow: none;
+        }
+
+        .status {
+            padding: 15px;
+            border-radius: 8px;
+            margin-top: 20px;
+            display: none;
+        }
+
+        .status.success {
+            background: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+
+        .status.error {
+            background: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+
+        .status.info {
+            background: #d1ecf1;
+            color: #0c5460;
+            border: 1px solid #bee5eb;
+        }
+
+        .audio-player {
+            margin-top: 20px;
+            padding: 20px;
+            background: #f8f9fa;
+            border-radius: 8px;
+            display: none;
+        }
+
+        audio {
+            width: 100%;
+            margin-top: 10px;
+        }
+
+        .voice-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+            gap: 15px;
+            margin-top: 15px;
+        }
+
+        .voice-card {
+            padding: 15px;
+            background: #f8f9fa;
+            border: 2px solid #e0e0e0;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+
+        .voice-card:hover {
+            border-color: #667eea;
+            background: #f0f4ff;
+        }
+
+        .voice-card.selected {
+            border-color: #667eea;
+            background: #e7edff;
+        }
+
+        .voice-name {
+            font-weight: 600;
+            color: #333;
+            margin-bottom: 5px;
+        }
+
+        .voice-desc {
+            font-size: 13px;
+            color: #666;
+        }
+
+        .loading {
+            display: inline-block;
+            width: 20px;
+            height: 20px;
+            border: 3px solid rgba(255,255,255,.3);
+            border-radius: 50%;
+            border-top-color: #fff;
+            animation: spin 1s ease-in-out infinite;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🎙️ 火山引擎 TTS</h1>
+            <p>高质量语音合成服务</p>
+        </div>
+
+        <div class="content">
+            <!-- 文本输入 -->
+            <div class="section">
+                <div class="section-title">📝 输入文本</div>
+                <div class="form-group">
+                    <label>要转换的文本：</label>
+                    <textarea id="textInput" placeholder="请输入要转换为语音的文本...">你好，欢迎使用火山引擎TTS语音合成服务。这是一个高质量、低延迟的语音合成系统。</textarea>
+                </div>
+            </div>
+
+            <!-- 音色选择 -->
+            <div class="section">
+                <div class="section-title">🎵 选择音色</div>
+                <div id="voiceGrid" class="voice-grid">
+                    <div class="voice-card" data-voice="zh_female_vv_uranus_bigtts">
+                        <div class="voice-name">✅ 薇薇</div>
+                        <div class="voice-desc">活泼灵动青年女声</div>
+                    </div>
+                    <div class="voice-card" data-voice="zh_female_xiaohe_uranus_bigtts">
+                        <div class="voice-name">✅ 小何</div>
+                        <div class="voice-desc">甜美亲切温柔女声，带一点软萌腔</div>
+                    </div>
+                    <div class="voice-card" data-voice="zh_male_m191_uranus_bigtts">
+                        <div class="voice-name">✅ 云舟</div>
+                        <div class="voice-desc">沉稳平和成熟男声，温润大叔感</div>
+                    </div>
+                    <div class="voice-card" data-voice="zh_male_taocheng_uranus_bigtts">
+                        <div class="voice-name">✅ 小天</div>
+                        <div class="voice-desc">阳光开朗少年感男声，青春朝气</div>
+                    </div>
+                    <div class="voice-card" data-voice="zh_male_cixingjieshuonan_uranus_bigtts">
+                        <div class="voice-name">✅ 磁性解说男声</div>
+                        <div class="voice-desc">嗓音有胸腔共鸣，大气有穿透力，适合头条快讯、片头导语、热点盘点类新闻</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 高级设置 -->
+            <div class="section">
+                <div class="section-title">⚙️ 高级设置</div>
+                <div class="form-group">
+                    <label>音频格式：</label>
+                    <select id="formatSelect">
+                        <option value="mp3">MP3</option>
+                        <option value="wav">WAV</option>
+                        <option value="pcm">PCM</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>采样率：</label>
+                    <select id="sampleRateSelect">
+                        <option value="8000">8000 Hz</option>
+                        <option value="16000">16000 Hz</option>
+                        <option value="24000" selected>24000 Hz</option>
+                    </select>
+                </div>
+            </div>
+
+            <!-- 操作按钮 -->
+            <div class="section">
+                <div class="button-group">
+                    <button onclick="generateSpeech()">
+                        🎤 生成语音
+                    </button>
+                    <button onclick="checkHealth()">
+                        ❤️ 健康检查
+                    </button>
+                </div>
+            </div>
+
+            <!-- 状态提示 -->
+            <div id="status" class="status"></div>
+
+            <!-- 音频播放器 -->
+            <div id="audioPlayer" class="audio-player">
+                <div style="font-weight: 600; margin-bottom: 10px;">🔊 生成的语音：</div>
+                <audio id="audio" controls></audio>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let selectedVoice = 'zh_female_vv_uranus_bigtts';
+
+        // 音色选择
+        document.querySelectorAll('.voice-card').forEach(card => {
+            card.addEventListener('click', function() {
+                document.querySelectorAll('.voice-card').forEach(c => c.classList.remove('selected'));
+                this.classList.add('selected');
+                selectedVoice = this.dataset.voice;
+            });
+        });
+
+        // 默认选中第一个音色（薇薇）
+        document.querySelector('.voice-card').classList.add('selected');
+
+        // 显示状态
+        function showStatus(message, type) {
+            const status = document.getElementById('status');
+            status.textContent = message;
+            status.className = 'status ' + type;
+            status.style.display = 'block';
+        }
+
+        // 生成语音
+        async function generateSpeech() {
+            const text = document.getElementById('textInput').value.trim();
+            if (!text) {
+                showStatus('请输入要转换的文本', 'error');
+                return;
+            }
+
+            const format = document.getElementById('formatSelect').value;
+            const sampleRate = parseInt(document.getElementById('sampleRateSelect').value);
+
+            const button = event.target;
+            button.disabled = true;
+            button.innerHTML = '<span class="loading"></span> 生成中...';
+
+            showStatus('正在生成语音，请稍候...', 'info');
+
+            try {
+                const response = await fetch('/api/volcengine/tts/generate-stream', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        text: text,
+                        speaker: selectedVoice,
+                        format: format,
+                        sampleRate: sampleRate
+                    })
+                });
+
+                if (!response.ok) {
+                    throw new Error('生成失败: ' + response.statusText);
+                }
+
+                const blob = await response.blob();
+                const audioUrl = URL.createObjectURL(blob);
+                
+                const audio = document.getElementById('audio');
+                audio.src = audioUrl;
+                
+                document.getElementById('audioPlayer').style.display = 'block';
+                
+                showStatus(`语音生成成功！文件大小: ${(blob.size / 1024).toFixed(2)} KB`, 'success');
+                
+                // 自动播放
+                audio.play();
+
+            } catch (error) {
+                showStatus('生成失败: ' + error.message, 'error');
+            } finally {
+                button.disabled = false;
+                button.innerHTML = '🎤 生成语音';
+            }
+        }
+
+        // 健康检查
+        async function checkHealth() {
+            const button = event.target;
+            button.disabled = true;
+            button.innerHTML = '<span class="loading"></span> 检查中...';
+
+            showStatus('正在检查服务状态...', 'info');
+
+            try {
+                const response = await fetch('/api/volcengine/tts/health');
+                const data = await response.json();
+
+                if (data.status === 'ok') {
+                    showStatus('✅ 服务正常运行', 'success');
+                } else {
+                    showStatus('❌ 服务异常: ' + (data.error || '未知错误'), 'error');
+                }
+
+            } catch (error) {
+                showStatus('❌ 健康检查失败: ' + error.message, 'error');
+            } finally {
+                button.disabled = false;
+                button.innerHTML = '❤️ 健康检查';
+            }
+        }
+
+        // 页面加载时执行健康检查
+        window.addEventListener('load', () => {
+            console.log('火山引擎 TTS 测试页面加载完成');
+        });
+    </script>
+</body>
+</html>

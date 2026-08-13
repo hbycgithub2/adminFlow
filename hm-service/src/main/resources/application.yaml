@@ -59,6 +59,21 @@ edge-tts:
   command: py -m edge_tts  # edge-tts 命令路径（使用 Python 模块方式）
   timeout: 30              # 超时时间（秒）
   temp-dir: d:/code/adminFlow/temp  # 临时文件目录（使用绝对路径）
+
+# 火山引擎 TTS 配置
+volcengine:
+  tts:
+    api-key: a83eef4b-bde3-4cbf-ac5f-0a35a17b31ad  # 火山引擎 API Key
+    resource-id: seed-tts-2.0                      # TTS 服务资源 ID（女声）
+    resource-id-big-model: volcano_tts             # 大模型资源 ID（男声/平静系列）
+    auto-select-resource-id: false                 # ⭐ 暂时关闭自动选择（API Key没有volcano_tts权限）
+    url: https://openspeech.bytedance.com/api/v3/tts/unidirectional  # API 地址
+    connect-timeout: 60                            # ⭐ 连接超时（秒）增加到60秒
+    request-timeout: 10                            # ⭐ 请求超时（分钟）增加到10分钟
+    default-speaker: zh_female_vv_uranus_bigtts    # 默认音色
+    default-format: mp3                            # 默认音频格式
+    default-sample-rate: 24000                     # 默认采样率
+    output-dir: tts                                # 音频输出目录
 hm:
   jwt:
     location: classpath:hmall.jks
@@ -71,11 +86,13 @@ hm:
       - /users/login
       - /items/**
       - /hi
-      - /api/edge-tts/**      # Edge TTS 接口（旧，保留兼容）
-      - /api/tts/**           # TTS 模块接口（新）
-      - /edge-tts-test.html   # Edge TTS 测试页面
-      - /tts-test.html        # TTS 测试页面（新）
-      - /**/*.html            # 所有静态 HTML 页面
-      - /**/*.js              # 所有 JS 文件
-      - /**/*.css             # 所有 CSS 文件
+      - /api/edge-tts/**          # Edge TTS 接口（旧，保留兼容）
+      - /api/tts/**               # TTS 模块接口（新）
+      - /api/volcengine/tts/**    # 火山引擎 TTS 接口
+      - /edge-tts-test.html       # Edge TTS 测试页面
+      - /tts-test.html            # TTS 测试页面（新）
+      - /volcengine-tts-test.html # 火山引擎 TTS 测试页面
+      - /**/*.html                # 所有静态 HTML 页面
+      - /**/*.js                  # 所有 JS 文件
+      - /**/*.css                 # 所有 CSS 文件
 # keytool -genkeypair -alias hmall -keyalg RSA -keypass hmall123 -keystore hmall.jks -storepass hmall123
