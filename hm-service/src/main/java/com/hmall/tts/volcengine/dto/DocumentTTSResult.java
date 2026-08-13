@@ -5,6 +5,8 @@ import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
+import java.util.List;
+
 /**
  * 文档TTS生成结果
  * 
@@ -58,6 +60,16 @@ public class DocumentTTSResult {
     private Integer apiCallCount;
     
     /**
+     * 对话片段列表（用于实时进度显示）
+     */
+    private List<DialogSegment> segments;
+    
+    /**
+     * 音频总时长（秒）
+     */
+    private Double totalDuration;
+    
+    /**
      * 成功返回
      */
     public static DocumentTTSResult success(String taskId, String audioUrl, Long audioSize, Long generateTime) {
@@ -68,6 +80,23 @@ public class DocumentTTSResult {
                 .audioUrl(audioUrl)
                 .audioSize(audioSize)
                 .generateTime(generateTime)
+                .build();
+    }
+    
+    /**
+     * 成功返回（包含片段信息）
+     */
+    public static DocumentTTSResult success(String taskId, String audioUrl, Long audioSize, Long generateTime,
+                                           List<DialogSegment> segments, Double totalDuration) {
+        return DocumentTTSResult.builder()
+                .success(true)
+                .message("文档TTS生成成功")
+                .taskId(taskId)
+                .audioUrl(audioUrl)
+                .audioSize(audioSize)
+                .generateTime(generateTime)
+                .segments(segments)
+                .totalDuration(totalDuration)
                 .build();
     }
     

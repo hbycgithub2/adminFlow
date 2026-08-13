@@ -243,6 +243,114 @@
         audio::-internal-media-controls-download-button {
             display: none !important;
         }
+
+        /* 文档内容预览区域 */
+        .document-preview {
+            margin-top: 20px;
+            padding: 20px;
+            background: #f8f9fa;
+            border-radius: 8px;
+            display: none;
+        }
+
+        .segments-container {
+            max-height: 500px;
+            overflow-y: auto;
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            border: 1px solid #e0e0e0;
+        }
+
+        /* 对话片段样式（整句容器） */
+        .segment {
+            padding: 14px 18px;
+            margin-bottom: 12px;
+            border-radius: 8px;
+            line-height: 1.8;
+            font-size: 16px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            border-left: 4px solid transparent;
+        }
+
+        /* 加粗片段（角色1）- 蓝色 */
+        .segment.bold-segment {
+            background: #e3f2fd;
+            border-left-color: #2196F3;
+        }
+
+        /* 非加粗片段（角色2）- 绿色 */
+        .segment.normal-segment {
+            background: #e8f5e9;
+            border-left-color: #4caf50;
+        }
+
+        /* 正在播放的整句 - 浅黄色背景 */
+        .segment.playing {
+            background: linear-gradient(135deg, #fff9c4 0%, #fff59d 100%) !important;
+            border-left-color: #fbc02d !important;
+            box-shadow: 0 6px 16px rgba(251, 192, 45, 0.4);
+            animation: pulse-glow 2s ease-in-out infinite;
+        }
+
+        /* 已播放的整句 - 半透明灰色 */
+        .segment.played {
+            opacity: 0.5;
+            filter: grayscale(50%);
+        }
+
+        /* 单个字符样式 */
+        .char {
+            display: inline-block;
+            transition: all 0.15s ease;
+        }
+
+        /* 未播放的字符 - 默认颜色 */
+        .bold-segment .char {
+            color: #1565c0; /* 蓝色 */
+        }
+
+        .normal-segment .char {
+            color: #2e7d32; /* 绿色 */
+        }
+
+        /* 正在播放的字符 - 深黄色 + 加粗 + 放大 */
+        .char.char-playing {
+            color: #f57f17 !important;
+            font-weight: bold;
+            transform: scale(1.18);
+            text-shadow: 0 0 10px rgba(251, 192, 45, 0.8);
+        }
+
+        /* 已播放的字符 - 深色 */
+        .bold-segment .char.char-played {
+            color: #0d47a1; /* 深蓝色 */
+        }
+
+        .normal-segment .char.char-played {
+            color: #1b5e20; /* 深绿色 */
+        }
+
+        /* 鼠标悬停效果 */
+        .segment:hover {
+            transform: translateX(5px);
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+        }
+
+        .segment.playing:hover {
+            transform: translateX(5px);
+        }
+
+        /* 脉动动画 */
+        @keyframes pulse-glow {
+            0%, 100% {
+                box-shadow: 0 6px 16px rgba(251, 192, 45, 0.4);
+            }
+            50% {
+                box-shadow: 0 8px 20px rgba(251, 192, 45, 0.6);
+            }
+        }
     </style>
 </head>
 <body>
@@ -362,6 +470,17 @@
                 </div>
             </div>
 
+            <!-- 文档内容预览（实时进度显示） -->
+            <div id="documentPreview" class="document-preview">
+                <div class="section-title">📄 文档内容预览（智能逐字高亮）</div>
+                <div id="segmentsContainer" class="segments-container">
+                    <!-- 动态生成对话片段 -->
+                </div>
+                <div style="margin-top: 15px; padding: 12px; background: #e3f2fd; border-radius: 5px; font-size: 13px; color: #1565c0;">
+                    💡 提示：点击任意句子可跳转播放 | 🟨 黄色背景=当前句 | 深黄字=正在说的字 | 智能时长分配+最后一字强制对齐
+                </div>
+            </div>
+
             <!-- 示例说明 -->
             <div class="example">
                 <div class="example-title">📝 文档格式示例</div>
@@ -383,6 +502,8 @@
         let currentAudioBlob = null;
         let currentAudioFormat = 'mp3';
         let currentFileName = 'document';
+        let dialogSegments = []; // 对话片段列表
+        let currentPlayingIndex = -1; // 当前播放片段索引
         
         // 显示状态
         function showStatus(message, type) {
@@ -435,45 +556,380 @@
                 formData.append('format', format);
                 formData.append('sampleRate', sampleRate);
                 
-                const response = await fetch('/api/document-tts/generate-stream', {
+                // 步骤1：调用JSON接口获取片段信息
+                console.log('步骤1：获取片段信息...');
+                const jsonResponse = await fetch('/api/document-tts/generate', {
                     method: 'POST',
                     body: formData
                 });
                 
-                if (!response.ok) {
-                    throw new Error('生成失败: ' + response.statusText);
+                if (!jsonResponse.ok) {
+                    throw new Error('生成失败: ' + jsonResponse.statusText);
                 }
                 
-                const blob = await response.blob();
-                currentAudioBlob = blob; // 保存 Blob 用于下载
+                const result = await jsonResponse.json();
                 
-                console.log('音频生成成功:');
+                console.log('TTS生成结果:', result);
+                
+                if (!result.success) {
+                    throw new Error(result.message || '生成失败');
+                }
+                
+                // 保存片段信息
+                dialogSegments = result.segments || [];
+                
+                console.log('对话片段数量:', dialogSegments.length);
+                console.log('音频总时长:', result.totalDuration, '秒');
+                
+                // 步骤2：使用stream接口重新生成音频（因为第一次生成的文件可能访问不到）
+                console.log('步骤2：获取音频流...');
+                const formData2 = new FormData();
+                formData2.append('file', file);
+                formData2.append('boldVoice', boldVoice);
+                formData2.append('normalVoice', normalVoice);
+                formData2.append('format', format);
+                formData2.append('sampleRate', sampleRate);
+                
+                const streamResponse = await fetch('/api/document-tts/generate-stream', {
+                    method: 'POST',
+                    body: formData2
+                });
+                
+                if (!streamResponse.ok) {
+                    throw new Error('获取音频流失败: ' + streamResponse.statusText);
+                }
+                
+                const blob = await streamResponse.blob();
+                currentAudioBlob = blob;
+                
+                console.log('音频加载成功:');
                 console.log('- Blob 大小:', blob.size, 'bytes');
                 console.log('- Blob 类型:', blob.type);
-                console.log('- 保存的格式:', currentAudioFormat);
                 
-                const audioUrl = URL.createObjectURL(blob);
+                const audioBlobUrl = URL.createObjectURL(blob);
                 
                 const audio = document.getElementById('audio');
-                audio.src = audioUrl;
+                audio.src = audioBlobUrl;
+                
+                // 等待音频加载完成，获取真实时长
+                await new Promise((resolve) => {
+                    audio.addEventListener('loadedmetadata', () => {
+                        const realDuration = audio.duration;
+                        const estimatedDuration = result.totalDuration;
+                        
+                        console.log('=== 时长对比 ===');
+                        console.log('后端估算时长:', estimatedDuration.toFixed(3), '秒');
+                        console.log('音频真实时长:', realDuration.toFixed(3), '秒');
+                        console.log('差异:', (realDuration - estimatedDuration).toFixed(3), '秒');
+                        
+                        // 使用真实时长校准片段时间戳
+                        if (Math.abs(realDuration - estimatedDuration) > 0.1) {
+                            console.log('⚠️ 检测到时长差异，开始校准片段时间戳...');
+                            calibrateSegmentTimings(dialogSegments, estimatedDuration, realDuration);
+                            console.log('✅ 片段时间戳校准完成');
+                        }
+                        
+                        resolve();
+                    }, { once: true });
+                });
                 
                 // 更新下载按钮文本，显示格式
                 const downloadBtn = document.getElementById('downloadBtn');
                 downloadBtn.innerHTML = `📥 下载音频文件 (${currentAudioFormat.toUpperCase()})`;
                 
+                // 显示音频播放器
                 document.getElementById('audioPlayer').style.display = 'block';
                 
-                showStatus(`对话语音生成成功！格式: ${format.toUpperCase()}, 文件大小: ${(blob.size / 1024).toFixed(2)} KB`, 'success');
+                // 渲染文档内容预览（在校准后渲染）
+                if (dialogSegments.length > 0) {
+                    renderDocumentPreview(dialogSegments);
+                    // 显示文档预览区域
+                    document.getElementById('documentPreview').style.display = 'block';
+                    // 绑定音频时间更新事件
+                    bindAudioTimeUpdate(audio);
+                }
+                
+                showStatus(`对话语音生成成功！格式: ${format.toUpperCase()}, 文件大小: ${(blob.size / 1024).toFixed(2)} KB, 共${dialogSegments.length}个片段`, 'success');
                 
                 // 自动播放
                 audio.play();
                 
             } catch (error) {
                 showStatus('生成失败: ' + error.message, 'error');
+                console.error('生成失败:', error);
             } finally {
                 button.disabled = false;
                 button.innerHTML = '🎤 生成对话语音';
             }
+        }
+        
+        // 校准片段时间戳（根据真实音频时长）
+        function calibrateSegmentTimings(segments, estimatedTotal, realTotal) {
+            if (segments.length === 0) return;
+            
+            console.log('=== 开始校准片段时间戳 ===');
+            console.log('后端估算总时长:', estimatedTotal.toFixed(3), '秒');
+            console.log('音频真实时长:', realTotal.toFixed(3), '秒');
+            
+            // 【重要】重新计算所有片段的时间，确保不超出音频时长
+            let currentTime = 0;
+            const totalEstimatedDuration = segments.reduce((sum, seg) => sum + seg.duration, 0);
+            
+            console.log('所有片段时长累加:', totalEstimatedDuration.toFixed(3), '秒');
+            
+            // 使用真实音频时长重新分配
+            segments.forEach((segment, index) => {
+                // 计算该片段在总时长中的占比
+                const proportion = segment.duration / totalEstimatedDuration;
+                
+                // 重新计算该片段的时长
+                const newDuration = realTotal * proportion;
+                
+                // 更新片段时间
+                segment.startTime = currentTime;
+                segment.duration = newDuration;
+                
+                // 校准逐字时间戳
+                if (segment.charTimings && segment.charTimings.length > 0) {
+                    const charCount = segment.charTimings.length;
+                    let charCurrentTime = currentTime;
+                    
+                    segment.charTimings.forEach((charTiming, charIndex) => {
+                        // 每个字均分片段时长
+                        const charDuration = newDuration / charCount;
+                        charTiming.startTime = charCurrentTime;
+                        charTiming.duration = charDuration;
+                        charCurrentTime += charDuration;
+                    });
+                }
+                
+                currentTime += newDuration;
+            });
+            
+            console.log('✅ 校准后的片段时间（保证不超出音频时长）:');
+            segments.forEach((seg, i) => {
+                console.log(`  片段${i}: ${seg.startTime.toFixed(3)}s - ${(seg.startTime + seg.duration).toFixed(3)}s (时长${seg.duration.toFixed(3)}s)`);
+            });
+            
+            console.log('校准后总时长:', currentTime.toFixed(3), '秒（应该 ≈', realTotal.toFixed(3), '秒）');
+        }
+        
+        // 渲染文档内容预览（逐字拆分 + 智能时长）
+        function renderDocumentPreview(segments) {
+            const container = document.getElementById('segmentsContainer');
+            container.innerHTML = ''; // 清空
+            
+            segments.forEach((segment, index) => {
+                const div = document.createElement('div');
+                div.className = 'segment';
+                div.classList.add(segment.isBold ? 'bold-segment' : 'normal-segment');
+                div.setAttribute('data-index', index);
+                div.setAttribute('data-start-time', segment.startTime);
+                div.setAttribute('data-duration', segment.duration);
+                
+                // 逐字拆分（使用智能时长分配）
+                if (segment.charTimings && segment.charTimings.length > 0) {
+                    segment.charTimings.forEach((charTiming, charIndex) => {
+                        const charSpan = document.createElement('span');
+                        charSpan.className = 'char';
+                        charSpan.setAttribute('data-segment-index', index);
+                        charSpan.setAttribute('data-char-index', charIndex);
+                        charSpan.setAttribute('data-start-time', charTiming.startTime);
+                        charSpan.setAttribute('data-duration', charTiming.duration);
+                        charSpan.textContent = charTiming.character;
+                        div.appendChild(charSpan);
+                    });
+                } else {
+                    // 降级方案：如果没有逐字时间戳，显示整句
+                    div.textContent = segment.text;
+                }
+                
+                // 点击跳转播放
+                div.addEventListener('click', () => {
+                    const audio = document.getElementById('audio');
+                    audio.currentTime = segment.startTime;
+                    audio.play();
+                    console.log(`跳转到片段${index}，时间${segment.startTime.toFixed(2)}秒`);
+                });
+                
+                container.appendChild(div);
+            });
+            
+            console.log('文档预览渲染完成，共', segments.length, '个片段（智能时长分配）');
+        }
+        
+        // 绑定音频时间更新事件（双层高亮：整句 + 逐字）
+        function bindAudioTimeUpdate(audio) {
+            let updateCount = 0;
+            
+            audio.addEventListener('timeupdate', () => {
+                const currentTime = audio.currentTime;
+                updateCount++;
+                
+                // 每10次更新输出一次调试信息
+                if (updateCount % 10 === 0) {
+                    console.log(`[音频时间更新] 当前时间: ${currentTime.toFixed(2)}s`);
+                }
+                
+                // 第1层：整句高亮（100%准确）
+                updateSegmentHighlight(currentTime);
+                
+                // 第2层：逐字高亮（完全基于整句时长均分）
+                updateCharHighlight(currentTime);
+            });
+            
+            // 播放结束时重置
+            audio.addEventListener('ended', () => {
+                console.log('[音频播放] 播放结束，重置所有高亮');
+                const allSegments = document.querySelectorAll('.segment');
+                allSegments.forEach(seg => {
+                    seg.classList.remove('playing');
+                    seg.classList.add('played');
+                });
+                
+                const allChars = document.querySelectorAll('.char');
+                allChars.forEach(char => {
+                    char.classList.remove('char-playing');
+                    char.classList.add('char-played');
+                });
+            });
+            
+            // 播放开始时重置
+            audio.addEventListener('play', () => {
+                console.log('[音频播放] 开始播放，当前时间:', audio.currentTime.toFixed(2));
+                if (audio.currentTime === 0) {
+                    const allSegments = document.querySelectorAll('.segment');
+                    allSegments.forEach(seg => {
+                        seg.classList.remove('playing', 'played');
+                    });
+                    
+                    const allChars = document.querySelectorAll('.char');
+                    allChars.forEach(char => {
+                        char.classList.remove('char-playing', 'char-played');
+                    });
+                }
+            });
+            
+            console.log('[音频事件] timeupdate事件已绑定');
+        }
+        
+        // 第1层：整句高亮（100%准确）
+        function updateSegmentHighlight(currentTime) {
+            let currentPlayingIndex = -1;
+            
+            // 找到当前播放的句子
+            dialogSegments.forEach((segment, index) => {
+                const segmentStartTime = segment.startTime;
+                const segmentEndTime = segment.startTime + segment.duration;
+                
+                if (currentTime >= segmentStartTime && currentTime < segmentEndTime) {
+                    currentPlayingIndex = index;
+                }
+            });
+            
+            // 更新所有句子的状态
+            const allSegments = document.querySelectorAll('.segment');
+            allSegments.forEach((segmentDiv, index) => {
+                if (index === currentPlayingIndex) {
+                    // 当前播放句：黄色背景
+                    if (!segmentDiv.classList.contains('playing')) {
+                        segmentDiv.classList.add('playing');
+                        segmentDiv.classList.remove('played');
+                        
+                        // 自动滚动到当前句
+                        segmentDiv.scrollIntoView({
+                            behavior: 'smooth',
+                            block: 'center'
+                        });
+                    }
+                } else if (index < currentPlayingIndex) {
+                    // 已播放句：灰色半透明
+                    segmentDiv.classList.remove('playing');
+                    segmentDiv.classList.add('played');
+                } else {
+                    // 未播放句：默认样式
+                    segmentDiv.classList.remove('playing', 'played');
+                }
+            });
+        }
+        
+        // 第2层：逐字高亮（完全基于整句时长均分，100%跟随整句）
+        function updateCharHighlight(currentTime) {
+            // 1. 找到当前播放的句子
+            let currentSegmentIndex = -1;
+            let currentSegment = null;
+            
+            dialogSegments.forEach((segment, index) => {
+                const segmentStartTime = segment.startTime;
+                const segmentEndTime = segment.startTime + segment.duration;
+                
+                if (currentTime >= segmentStartTime && currentTime < segmentEndTime) {
+                    currentSegmentIndex = index;
+                    currentSegment = segment;
+                }
+            });
+            
+            // 2. 如果没有正在播放的句子，清除所有逐字高亮
+            if (currentSegmentIndex === -1) {
+                const allChars = document.querySelectorAll('.char');
+                allChars.forEach(char => {
+                    const segmentIndex = parseInt(char.getAttribute('data-segment-index'));
+                    if (segmentIndex < dialogSegments.length) {
+                        const segment = dialogSegments[segmentIndex];
+                        const segmentEndTime = segment.startTime + segment.duration;
+                        
+                        if (currentTime >= segmentEndTime) {
+                            // 整句已播放完，标记为已播放
+                            char.classList.remove('char-playing');
+                            char.classList.add('char-played');
+                        } else {
+                            // 整句未开始，清除状态
+                            char.classList.remove('char-playing', 'char-played');
+                        }
+                    }
+                });
+                return;
+            }
+            
+            // 3. 【新方案】完全基于整句时长均分计算逐字高亮
+            const currentSegmentChars = document.querySelectorAll(`.char[data-segment-index="${currentSegmentIndex}"]`);
+            const charCount = currentSegmentChars.length;
+            
+            if (charCount === 0) {
+                console.warn(`⚠️ 片段${currentSegmentIndex}没有字符元素`);
+                return;
+            }
+            
+            // 计算当前句子的播放进度（0-1）
+            const segmentProgress = (currentTime - currentSegment.startTime) / currentSegment.duration;
+            
+            // 计算应该高亮到第几个字（向下取整）
+            const currentCharIndex = Math.floor(segmentProgress * charCount);
+            
+            // 调试日志（每0.5秒输出一次）
+            if (Math.floor(currentTime * 2) !== Math.floor((currentTime - 0.05) * 2)) {
+                console.log(`[逐字高亮] 时间${currentTime.toFixed(2)}s，片段${currentSegmentIndex}，` +
+                           `进度${(segmentProgress*100).toFixed(1)}%，高亮第${currentCharIndex}/${charCount}字，` +
+                           `字符="${currentSegmentChars[currentCharIndex]?.textContent}"`);
+            }
+            
+            // 更新所有字的状态
+            currentSegmentChars.forEach((char, index) => {
+                if (index < currentCharIndex) {
+                    // 已播放字：深色
+                    char.classList.remove('char-playing');
+                    char.classList.add('char-played');
+                } else if (index === currentCharIndex) {
+                    // 当前字：深黄色加粗放大
+                    if (!char.classList.contains('char-playing')) {
+                        char.classList.add('char-playing');
+                        char.classList.remove('char-played');
+                    }
+                } else {
+                    // 未播放字：默认颜色
+                    char.classList.remove('char-playing', 'char-played');
+                }
+            });
         }
         
         // 下载音频文件

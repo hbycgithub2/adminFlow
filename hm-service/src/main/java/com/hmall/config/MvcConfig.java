@@ -47,7 +47,9 @@ public class MvcConfig implements WebMvcConfigurer {
                 "/v3/**",
                 "/swagger-resources/**",
                 "/webjars/**",
-                "/doc.html"
+                "/doc.html",
+                "/tts/**",  // TTS音频文件访问
+                "/api/document-tts/**"  // TTS API接口
                 );
 
     }
