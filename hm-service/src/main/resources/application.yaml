@@ -89,9 +89,11 @@ hm:
       - /api/edge-tts/**          # Edge TTS 接口（旧，保留兼容）
       - /api/tts/**               # TTS 模块接口（新）
       - /api/volcengine/tts/**    # 火山引擎 TTS 接口
+      - /api/document-tts/**      # 文档 TTS 接口（新增）
       - /edge-tts-test.html       # Edge TTS 测试页面
       - /tts-test.html            # TTS 测试页面（新）
       - /volcengine-tts-test.html # 火山引擎 TTS 测试页面
+      - /document-tts-test.html   # 文档 TTS 测试页面（新增）
       - /**/*.html                # 所有静态 HTML 页面
       - /**/*.js                  # 所有 JS 文件
       - /**/*.css                 # 所有 CSS 文件

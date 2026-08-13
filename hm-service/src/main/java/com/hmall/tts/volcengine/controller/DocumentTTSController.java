@@ -1,0 +1,136 @@
+package com.hmall.tts.volcengine.controller;
+
+import com.hmall.tts.volcengine.dto.DocumentTTSResult;
+import com.hmall.tts.volcengine.dto.VoiceConfig;
+import com.hmall.tts.volcengine.service.DocumentTTSService;
+import io.swagger.annotations.Api;
+import io.swagger.annotations.ApiOperation;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.MediaType;
+import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.*;
+import org.springframework.web.multipart.MultipartFile;
+
+/**
+ * 文档TTS控制器
+ * 提供Word文档对话语音生成功能
+ * 
+ * @author Kiro
+ * @since 2026-08-14
+ */
+@Slf4j
+@RestController
+@RequestMapping("/api/document-tts")
+@RequiredArgsConstructor
+@Api(tags = "文档TTS接口")
+public class DocumentTTSController {
+    
+    private final DocumentTTSService documentTTSService;
+    
+    /**
+     * 生成文档对话语音（返回文件信息）
+     */
+    @PostMapping("/generate")
+    @ApiOperation("生成文档对话语音")
+    public ResponseEntity<DocumentTTSResult> generateDocumentSpeech(
+            @RequestParam("file") MultipartFile file,
+            @RequestParam(value = "boldVoice", defaultValue = "zh_male_m191_uranus_bigtts") String boldVoice,
+            @RequestParam(value = "normalVoice", defaultValue = "zh_female_vv_uranus_bigtts") String normalVoice,
+            @RequestParam(value = "format", defaultValue = "mp3") String format,
+            @RequestParam(value = "sampleRate", defaultValue = "24000") Integer sampleRate
+    ) {
+        log.info("收到文档TTS请求: 文件={}, 加粗音色={}, 非加粗音色={}", 
+                file.getOriginalFilename(), boldVoice, normalVoice);
+        
+        try {
+            VoiceConfig voiceConfig = VoiceConfig.builder()
+                    .boldVoice(boldVoice)
+                    .normalVoice(normalVoice)
+                    .format(format)
+                    .sampleRate(sampleRate)
+                    .build();
+            
+            DocumentTTSResult result = documentTTSService.generateDocumentSpeech(file, voiceConfig);
+            
+            if (result.getSuccess()) {
+                log.info("文档TTS生成成功: 任务ID={}, URL={}", result.getTaskId(), result.getAudioUrl());
+                return ResponseEntity.ok(result);
+            } else {
+                log.error("文档TTS生成失败: {}", result.getMessage());
+                return ResponseEntity.badRequest().body(result);
+            }
+            
+        } catch (Exception e) {
+            log.error("文档TTS生成异常: {}", e.getMessage(), e);
+            return ResponseEntity.internalServerError()
+                    .body(DocumentTTSResult.fail("文档TTS生成异常: " + e.getMessage()));
+        }
+    }
+    
+    /**
+     * 生成文档对话语音（返回音频流）
+     */
+    @PostMapping("/generate-stream")
+    @ApiOperation("生成文档对话语音（流式）")
+    public ResponseEntity<byte[]> generateDocumentSpeechStream(
+            @RequestParam("file") MultipartFile file,
+            @RequestParam(value = "boldVoice", defaultValue = "zh_male_m191_uranus_bigtts") String boldVoice,
+            @RequestParam(value = "normalVoice", defaultValue = "zh_female_vv_uranus_bigtts") String normalVoice,
+            @RequestParam(value = "format", defaultValue = "mp3") String format,
+            @RequestParam(value = "sampleRate", defaultValue = "24000") Integer sampleRate
+    ) {
+        log.info("收到文档TTS流式请求: 文件={}, 加粗音色={}, 非加粗音色={}", 
+                file.getOriginalFilename(), boldVoice, normalVoice);
+        
+        try {
+            VoiceConfig voiceConfig = VoiceConfig.builder()
+                    .boldVoice(boldVoice)
+                    .normalVoice(normalVoice)
+                    .format(format)
+                    .sampleRate(sampleRate)
+                    .build();
+            
+            byte[] audioData = documentTTSService.generateDocumentSpeechBytes(file, voiceConfig);
+            
+            HttpHeaders headers = new HttpHeaders();
+            headers.setContentType(MediaType.parseMediaType("audio/mpeg"));
+            headers.setContentDispositionFormData("attachment", 
+                    file.getOriginalFilename().replace(".docx", ".mp3"));
+            
+            log.info("文档TTS流式生成成功，大小: {} KB", audioData.length / 1024.0);
+            
+            return ResponseEntity.ok()
+                    .headers(headers)
+                    .body(audioData);
+            
+        } catch (Exception e) {
+            log.error("文档TTS流式生成失败: {}", e.getMessage(), e);
+            return ResponseEntity.internalServerError().build();
+        }
+    }
+    
+    /**
+     * 快速测试接口
+     */
+    @PostMapping("/test")
+    @ApiOperation("快速测试文档TTS")
+    public ResponseEntity<DocumentTTSResult> testDocumentTTS(
+            @RequestParam("file") MultipartFile file
+    ) {
+        log.info("收到文档TTS测试请求: 文件={}", file.getOriginalFilename());
+        
+        // 使用默认配置
+        VoiceConfig voiceConfig = VoiceConfig.builder()
+                .boldVoice("zh_male_m191_uranus_bigtts")  // 云舟（男声）
+                .normalVoice("zh_female_vv_uranus_bigtts") // 薇薇（女声）
+                .format("mp3")
+                .sampleRate(24000)
+                .build();
+        
+        DocumentTTSResult result = documentTTSService.generateDocumentSpeech(file, voiceConfig);
+        
+        return ResponseEntity.ok(result);
+    }
+}

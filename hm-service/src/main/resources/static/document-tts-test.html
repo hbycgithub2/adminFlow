@@ -1,0 +1,522 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Word文档对话TTS测试页面</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 900px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 20px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+            overflow: hidden;
+        }
+
+        .header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 30px;
+            text-align: center;
+        }
+
+        .header h1 {
+            font-size: 32px;
+            margin-bottom: 10px;
+        }
+
+        .header p {
+            font-size: 16px;
+            opacity: 0.9;
+        }
+
+        .content {
+            padding: 30px;
+        }
+
+        .section {
+            margin-bottom: 30px;
+        }
+
+        .section-title {
+            font-size: 20px;
+            color: #333;
+            margin-bottom: 15px;
+            padding-bottom: 10px;
+            border-bottom: 2px solid #667eea;
+        }
+
+        .form-group {
+            margin-bottom: 20px;
+        }
+
+        label {
+            display: block;
+            font-weight: 600;
+            color: #555;
+            margin-bottom: 8px;
+        }
+
+        input[type="file"] {
+            width: 100%;
+            padding: 12px;
+            border: 2px solid #e0e0e0;
+            border-radius: 8px;
+            font-size: 14px;
+            transition: border-color 0.3s;
+        }
+
+        input[type="file"]:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+
+        select {
+            width: 100%;
+            padding: 12px;
+            border: 2px solid #e0e0e0;
+            border-radius: 8px;
+            font-size: 14px;
+            transition: border-color 0.3s;
+        }
+
+        select:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+
+        .voice-info {
+            background: #f8f9fa;
+            padding: 15px;
+            border-radius: 8px;
+            margin-top: 10px;
+        }
+
+        .voice-info div {
+            padding: 5px 0;
+            color: #666;
+            font-size: 14px;
+        }
+
+        .tip-box {
+            background: #fff3cd;
+            border: 1px solid #ffc107;
+            border-radius: 8px;
+            padding: 15px;
+            margin-bottom: 20px;
+        }
+
+        .tip-box strong {
+            color: #856404;
+        }
+
+        button {
+            width: 100%;
+            padding: 14px 28px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            border-radius: 8px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s;
+            box-shadow: 0 4px 15px rgba(102, 126, 234, 0.4);
+        }
+
+        button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(102, 126, 234, 0.6);
+        }
+
+        button:active {
+            transform: translateY(0);
+        }
+
+        button:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+            box-shadow: none;
+        }
+
+        #downloadBtn {
+            font-size: 16px;
+            font-weight: 600;
+            padding: 14px 28px;
+        }
+
+        .status {
+            padding: 15px;
+            border-radius: 8px;
+            margin-top: 20px;
+            display: none;
+        }
+
+        .status.success {
+            background: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+
+        .status.error {
+            background: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+
+        .status.info {
+            background: #d1ecf1;
+            color: #0c5460;
+            border: 1px solid #bee5eb;
+        }
+
+        .audio-player {
+            margin-top: 20px;
+            padding: 20px;
+            background: #f8f9fa;
+            border-radius: 8px;
+            display: none;
+        }
+
+        audio {
+            width: 100%;
+            margin-top: 10px;
+        }
+
+        .loading {
+            display: inline-block;
+            width: 20px;
+            height: 20px;
+            border: 3px solid rgba(255,255,255,.3);
+            border-radius: 50%;
+            border-top-color: #fff;
+            animation: spin 1s ease-in-out infinite;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        .example {
+            background: #e7f3ff;
+            border-left: 4px solid #2196F3;
+            padding: 15px;
+            margin-top: 15px;
+            border-radius: 4px;
+        }
+
+        .example-title {
+            font-weight: 600;
+            color: #1976D2;
+            margin-bottom: 10px;
+        }
+
+        .example-text {
+            font-size: 14px;
+            line-height: 1.6;
+            color: #555;
+        }
+
+        /* 隐藏浏览器音频控件的下载按钮 */
+        audio::-webkit-media-controls-download-button {
+            display: none !important;
+        }
+
+        audio::-moz-media-controls-download-button {
+            display: none !important;
+        }
+
+        audio::-internal-media-controls-download-button {
+            display: none !important;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>📄 Word文档对话TTS</h1>
+            <p>上传Word文档，智能识别加粗文本，生成多角色对话语音</p>
+        </div>
+
+        <div class="content">
+            <!-- 文档上传 -->
+            <div class="section">
+                <div class="section-title">📤 上传Word文档</div>
+                
+                <div class="tip-box">
+                    <strong>💡 使用提示：</strong><br>
+                    1. 只支持 .docx 格式的Word文档<br>
+                    2. 文档中<strong>加粗的文本</strong>会用"角色1音色"合成<br>
+                    3. 非加粗的文本会用"角色2音色"合成<br>
+                    4. 可自由选择男声/女声组合<br>
+                    5. 文档大小不超过10MB
+                </div>
+                
+                <div class="form-group">
+                    <label>选择Word文档（.docx）：</label>
+                    <input type="file" id="docxFile" accept=".docx" />
+                </div>
+            </div>
+
+            <!-- 音色配置 -->
+            <div class="section">
+                <div class="section-title">🎤 音色配置</div>
+                
+                <div class="form-group">
+                    <label>加粗文本音色：</label>
+                    <select id="boldVoice">
+                        <optgroup label="👨 男声">
+                            <option value="zh_male_m191_uranus_bigtts" selected>云舟（沉稳男声）</option>
+                            <option value="zh_male_taocheng_uranus_bigtts">小天（阳光男声）</option>
+                        </optgroup>
+                        <optgroup label="👩 女声">
+                            <option value="zh_female_vv_uranus_bigtts">薇薇（温柔女声）</option>
+                            <option value="zh_female_xiaohe_uranus_bigtts">小何（甜美女声）</option>
+                        </optgroup>
+                    </select>
+                </div>
+                
+                <div class="form-group">
+                    <label>非加粗文本音色：</label>
+                    <select id="normalVoice">
+                        <optgroup label="👩 女声">
+                            <option value="zh_female_vv_uranus_bigtts" selected>薇薇（温柔女声）</option>
+                            <option value="zh_female_xiaohe_uranus_bigtts">小何（甜美女声）</option>
+                        </optgroup>
+                        <optgroup label="👨 男声">
+                            <option value="zh_male_m191_uranus_bigtts">云舟（沉稳男声）</option>
+                            <option value="zh_male_taocheng_uranus_bigtts">小天（阳光男声）</option>
+                        </optgroup>
+                    </select>
+                </div>
+                
+                <div class="voice-info">
+                    <div>✅ 加粗文本 = 角色1（可选 2男+2女）</div>
+                    <div>✅ 非加粗文本 = 角色2（可选 2女+2男）</div>
+                    <div>✅ 灵活搭配，自由选择音色组合</div>
+                </div>
+            </div>
+
+            <!-- 音频配置 -->
+            <div class="section">
+                <div class="section-title">🔊 音频配置</div>
+                
+                <div class="form-group">
+                    <label>音频格式：</label>
+                    <select id="audioFormat">
+                        <option value="mp3" selected>MP3（推荐，兼容性好）</option>
+                        <option value="wav">WAV（无损音质，文件较大）</option>
+                        <option value="ogg">OGG（体积小，开源格式）</option>
+                    </select>
+                </div>
+                
+                <div class="form-group">
+                    <label>采样率：</label>
+                    <select id="sampleRate">
+                        <option value="8000">8000 Hz（电话音质，文件最小）</option>
+                        <option value="16000">16000 Hz（标准音质，平衡）</option>
+                        <option value="24000" selected>24000 Hz（高音质，推荐）</option>
+                    </select>
+                </div>
+                
+                <div class="voice-info">
+                    <div>💡 音频格式影响文件大小和兼容性</div>
+                    <div>💡 采样率越高音质越好，但文件越大</div>
+                    <div>💡 推荐使用默认配置（MP3 + 24000Hz）</div>
+                </div>
+            </div>
+
+            <!-- 操作按钮 -->
+            <div class="section">
+                <button onclick="generateDocumentSpeech()">
+                    🎤 生成对话语音
+                </button>
+            </div>
+
+            <!-- 状态提示 -->
+            <div id="status" class="status"></div>
+
+            <!-- 音频播放器 -->
+            <div id="audioPlayer" class="audio-player">
+                <div style="font-weight: 600; margin-bottom: 10px;">🔊 生成的对话语音：</div>
+                <audio id="audio" controls controlsList="nodownload noremoteplayback"></audio>
+                <button id="downloadBtn" onclick="downloadAudio()" style="margin-top: 15px; width: 100%; background: linear-gradient(135deg, #11998e 0%, #38ef7d 100%);">
+                    📥 下载音频文件
+                </button>
+                <div style="margin-top: 10px; padding: 10px; background: #fff3cd; border-radius: 5px; font-size: 13px; color: #856404;">
+                    💡 提示：请使用上方绿色的"下载音频文件"按钮，可保证文件格式正确（.mp3/.wav/.ogg）
+                </div>
+            </div>
+
+            <!-- 示例说明 -->
+            <div class="example">
+                <div class="example-title">📝 文档格式示例</div>
+                <div class="example-text">
+                    你好，<strong>云舟很高兴认识你</strong><br>
+                    你好，小薇我也很高兴认识你<br>
+                    <strong>你来自哪里？</strong><br>
+                    我来自吉林，你呢<br>
+                    <strong>我来自大连</strong><br><br>
+                    <em>说明：加粗的文本会用"角色1音色"，非加粗的用"角色2音色"</em><br>
+                    <em>提示：可以自由搭配音色，例如：加粗=女声+非加粗=男声</em>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // 全局变量：保存当前音频 Blob 和格式
+        let currentAudioBlob = null;
+        let currentAudioFormat = 'mp3';
+        let currentFileName = 'document';
+        
+        // 显示状态
+        function showStatus(message, type) {
+            const status = document.getElementById('status');
+            status.textContent = message;
+            status.className = 'status ' + type;
+            status.style.display = 'block';
+        }
+
+        // 生成文档对话语音
+        async function generateDocumentSpeech() {
+            const fileInput = document.getElementById('docxFile');
+            const file = fileInput.files[0];
+            
+            if (!file) {
+                showStatus('请先选择Word文档', 'error');
+                return;
+            }
+            
+            if (!file.name.endsWith('.docx')) {
+                showStatus('只支持.docx格式的Word文档', 'error');
+                return;
+            }
+            
+            const boldVoice = document.getElementById('boldVoice').value;
+            const normalVoice = document.getElementById('normalVoice').value;
+            const format = document.getElementById('audioFormat').value;
+            const sampleRate = document.getElementById('sampleRate').value;
+            
+            // 保存当前配置
+            currentAudioFormat = format;
+            currentFileName = file.name.replace('.docx', '');
+            
+            console.log('生成语音配置:');
+            console.log('- 文件名:', currentFileName);
+            console.log('- 格式:', format);
+            console.log('- 采样率:', sampleRate);
+            
+            const button = event.target;
+            button.disabled = true;
+            button.innerHTML = '<span class="loading"></span> 正在生成中，请稍候...';
+            
+            showStatus(`正在解析文档并生成语音（${format.toUpperCase()} @ ${sampleRate}Hz），这可能需要几十秒...`, 'info');
+            
+            try {
+                const formData = new FormData();
+                formData.append('file', file);
+                formData.append('boldVoice', boldVoice);
+                formData.append('normalVoice', normalVoice);
+                formData.append('format', format);
+                formData.append('sampleRate', sampleRate);
+                
+                const response = await fetch('/api/document-tts/generate-stream', {
+                    method: 'POST',
+                    body: formData
+                });
+                
+                if (!response.ok) {
+                    throw new Error('生成失败: ' + response.statusText);
+                }
+                
+                const blob = await response.blob();
+                currentAudioBlob = blob; // 保存 Blob 用于下载
+                
+                console.log('音频生成成功:');
+                console.log('- Blob 大小:', blob.size, 'bytes');
+                console.log('- Blob 类型:', blob.type);
+                console.log('- 保存的格式:', currentAudioFormat);
+                
+                const audioUrl = URL.createObjectURL(blob);
+                
+                const audio = document.getElementById('audio');
+                audio.src = audioUrl;
+                
+                // 更新下载按钮文本，显示格式
+                const downloadBtn = document.getElementById('downloadBtn');
+                downloadBtn.innerHTML = `📥 下载音频文件 (${currentAudioFormat.toUpperCase()})`;
+                
+                document.getElementById('audioPlayer').style.display = 'block';
+                
+                showStatus(`对话语音生成成功！格式: ${format.toUpperCase()}, 文件大小: ${(blob.size / 1024).toFixed(2)} KB`, 'success');
+                
+                // 自动播放
+                audio.play();
+                
+            } catch (error) {
+                showStatus('生成失败: ' + error.message, 'error');
+            } finally {
+                button.disabled = false;
+                button.innerHTML = '🎤 生成对话语音';
+            }
+        }
+        
+        // 下载音频文件
+        function downloadAudio() {
+            if (!currentAudioBlob) {
+                showStatus('没有可下载的音频文件，请先生成语音', 'error');
+                return;
+            }
+            
+            console.log('开始下载音频...');
+            console.log('文件名:', currentFileName);
+            console.log('格式:', currentAudioFormat);
+            console.log('完整文件名:', `${currentFileName}.${currentAudioFormat}`);
+            
+            // 创建下载链接
+            const url = URL.createObjectURL(currentAudioBlob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `${currentFileName}.${currentAudioFormat}`;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+            
+            showStatus(`音频文件下载成功：${currentFileName}.${currentAudioFormat}`, 'success');
+        }
+        
+        // 页面加载时执行
+        window.addEventListener('load', () => {
+            console.log('Word文档对话TTS测试页面加载完成');
+            
+            // 添加格式变化提示
+            const formatSelect = document.getElementById('audioFormat');
+            const sampleRateSelect = document.getElementById('sampleRate');
+            
+            formatSelect.addEventListener('change', (e) => {
+                console.log('音频格式切换为: ' + e.target.value);
+            });
+            
+            sampleRateSelect.addEventListener('change', (e) => {
+                console.log('采样率切换为: ' + e.target.value + ' Hz');
+            });
+        });
+    </script>
+</body>
+</html>
