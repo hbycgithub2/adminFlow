@@ -1,0 +1,711 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>字幕编辑器</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Microsoft YaHei', Arial, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 15px;
+            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.2);
+            overflow: hidden;
+        }
+
+        .header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 30px;
+        }
+
+        .header h1 {
+            font-size: 32px;
+            margin-bottom: 10px;
+        }
+
+        .video-info {
+            display: flex;
+            gap: 30px;
+            font-size: 14px;
+            opacity: 0.9;
+        }
+
+        .video-info span {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .toolbar {
+            padding: 20px 30px;
+            background: #f8f9fa;
+            border-bottom: 2px solid #e0e0e0;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .toolbar-left {
+            display: flex;
+            gap: 15px;
+        }
+
+        .btn {
+            padding: 10px 20px;
+            border: none;
+            border-radius: 8px;
+            font-size: 14px;
+            cursor: pointer;
+            transition: all 0.3s;
+            font-weight: 500;
+        }
+
+        .btn-primary {
+            background: #667eea;
+            color: white;
+        }
+
+        .btn-primary:hover {
+            background: #5568d3;
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(102, 126, 234, 0.4);
+        }
+
+        .btn-success {
+            background: #28a745;
+            color: white;
+        }
+
+        .btn-success:hover {
+            background: #218838;
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(40, 167, 69, 0.4);
+        }
+
+        .btn-secondary {
+            background: #6c757d;
+            color: white;
+        }
+
+        .btn-secondary:hover {
+            background: #5a6268;
+        }
+
+        .content {
+            padding: 30px;
+        }
+
+        .subtitle-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 20px;
+        }
+
+        .subtitle-table th {
+            background: #f8f9fa;
+            padding: 15px;
+            text-align: left;
+            font-weight: 600;
+            color: #495057;
+            border-bottom: 2px solid #dee2e6;
+        }
+
+        .subtitle-table td {
+            padding: 15px;
+            border-bottom: 1px solid #dee2e6;
+        }
+
+        .subtitle-table tr:hover {
+            background: #f8f9fa;
+        }
+
+        .subtitle-text {
+            max-width: 400px;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+
+        .subtitle-time {
+            color: #6c757d;
+            font-family: 'Courier New', monospace;
+        }
+
+        .btn-edit {
+            padding: 6px 12px;
+            background: #007bff;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 13px;
+        }
+
+        .btn-edit:hover {
+            background: #0056b3;
+        }
+
+        /* 对话框样式 */
+        .modal {
+            display: none;
+            position: fixed;
+            z-index: 1000;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.5);
+            backdrop-filter: blur(5px);
+        }
+
+        .modal-content {
+            position: relative;
+            background: white;
+            margin: 5% auto;
+            padding: 0;
+            width: 90%;
+            max-width: 700px;
+            border-radius: 15px;
+            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.3);
+            animation: slideDown 0.3s ease;
+        }
+
+        @keyframes slideDown {
+            from {
+                transform: translateY(-50px);
+                opacity: 0;
+            }
+            to {
+                transform: translateY(0);
+                opacity: 1;
+            }
+        }
+
+        .modal-header {
+            padding: 20px 30px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border-radius: 15px 15px 0 0;
+        }
+
+        .modal-header h2 {
+            font-size: 24px;
+        }
+
+        .modal-body {
+            padding: 30px;
+        }
+
+        .form-group {
+            margin-bottom: 20px;
+        }
+
+        .form-group label {
+            display: block;
+            margin-bottom: 8px;
+            font-weight: 500;
+            color: #495057;
+        }
+
+        .form-group input,
+        .form-group textarea,
+        .form-group select {
+            width: 100%;
+            padding: 10px 15px;
+            border: 2px solid #dee2e6;
+            border-radius: 8px;
+            font-size: 14px;
+            transition: border-color 0.3s;
+        }
+
+        .form-group input:focus,
+        .form-group textarea:focus,
+        .form-group select:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+
+        .form-group textarea {
+            resize: vertical;
+            min-height: 80px;
+        }
+
+        .form-row {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+        }
+
+        .modal-footer {
+            padding: 20px 30px;
+            background: #f8f9fa;
+            border-radius: 0 0 15px 15px;
+            display: flex;
+            justify-content: flex-end;
+            gap: 10px;
+        }
+
+        .loading {
+            display: none;
+            text-align: center;
+            padding: 40px;
+            color: #667eea;
+        }
+
+        .loading-spinner {
+            width: 50px;
+            height: 50px;
+            border: 4px solid #f3f3f3;
+            border-top: 4px solid #667eea;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin: 0 auto 20px;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        .alert {
+            padding: 15px 20px;
+            margin-bottom: 20px;
+            border-radius: 8px;
+            display: none;
+        }
+
+        .alert-success {
+            background: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+
+        .alert-error {
+            background: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+
+        .empty-state {
+            text-align: center;
+            padding: 60px 20px;
+            color: #6c757d;
+        }
+
+        .empty-state h3 {
+            font-size: 24px;
+            margin-bottom: 10px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <!-- 头部 -->
+        <div class="header">
+            <h1>🎬 字幕编辑器</h1>
+            <div class="video-info">
+                <span>📹 视频ID: <span id="taskIdDisplay">-</span></span>
+                <span>⏱️ 总时长: <span id="totalDuration">0.0</span> 秒</span>
+                <span>📝 字幕数: <span id="subtitleCount">0</span> 条</span>
+            </div>
+        </div>
+
+        <!-- 工具栏 -->
+        <div class="toolbar">
+            <div class="toolbar-left">
+                <input type="text" id="taskIdInput" placeholder="输入任务ID..." 
+                       style="padding: 10px 15px; border: 2px solid #dee2e6; border-radius: 8px; width: 300px;">
+                <button class="btn btn-primary" onclick="loadSubtitles()">加载字幕</button>
+            </div>
+            <div>
+                <button class="btn btn-success" onclick="saveSubtitles()" id="saveBtn" disabled>💾 保存修改</button>
+                <button class="btn btn-success" onclick="regenerateVideo()" id="regenerateBtn" disabled>🎥 重新生成视频</button>
+            </div>
+        </div>
+
+        <!-- 内容区域 -->
+        <div class="content">
+            <div class="alert alert-success" id="successAlert"></div>
+            <div class="alert alert-error" id="errorAlert"></div>
+
+            <div class="loading" id="loading">
+                <div class="loading-spinner"></div>
+                <p>处理中，请稍候...</p>
+            </div>
+
+            <div id="emptyState" class="empty-state">
+                <h3>👆 请输入任务ID并点击"加载字幕"</h3>
+                <p>您可以编辑已生成视频的字幕内容、时间和样式</p>
+            </div>
+
+            <table class="subtitle-table" id="subtitleTable" style="display: none;">
+                <thead>
+                    <tr>
+                        <th style="width: 60px;">序号</th>
+                        <th>文本内容</th>
+                        <th style="width: 120px;">开始时间</th>
+                        <th style="width: 120px;">持续时间</th>
+                        <th style="width: 100px;">操作</th>
+                    </tr>
+                </thead>
+                <tbody id="subtitleTableBody">
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <!-- 编辑对话框 -->
+    <div id="editModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>编辑字幕 - 序号 <span id="editSubtitleId"></span></h2>
+            </div>
+            <div class="modal-body">
+                <div class="form-group">
+                    <label>文本内容</label>
+                    <textarea id="editText" maxlength="100" placeholder="最多100字符"></textarea>
+                </div>
+
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>开始时间（秒）</label>
+                        <input type="number" id="editStartTime" step="0.1" min="0">
+                    </div>
+                    <div class="form-group">
+                        <label>持续时间（秒）</label>
+                        <input type="number" id="editDuration" step="0.1" min="0.1">
+                    </div>
+                </div>
+
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>字体名称</label>
+                        <select id="editFontName">
+                            <option value="Microsoft YaHei">微软雅黑</option>
+                            <option value="SimHei">黑体</option>
+                            <option value="SimSun">宋体</option>
+                            <option value="Arial">Arial</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>字体大小</label>
+                        <input type="number" id="editFontSize" min="24" max="96" value="64">
+                    </div>
+                </div>
+
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>字体颜色</label>
+                        <input type="color" id="editFontColor" value="#FFFFFF">
+                    </div>
+                    <div class="form-group">
+                        <label>边框颜色</label>
+                        <input type="color" id="editBorderColor" value="#000000">
+                    </div>
+                </div>
+
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>边框粗细</label>
+                        <input type="number" id="editBorderWidth" min="1" max="5" value="3">
+                    </div>
+                    <div class="form-group">
+                        <label>动画效果</label>
+                        <select id="editAnimationType">
+                            <option value="fade">渐入渐出</option>
+                            <option value="slide_up">从下飞入</option>
+                            <option value="slide_down">从上飞入</option>
+                            <option value="slide_left">从左飞入</option>
+                            <option value="slide_right">从右飞入</option>
+                            <option value="zoom_in">缩放进入</option>
+                            <option value="bounce">弹跳效果</option>
+                            <option value="none">无动画</option>
+                        </select>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-secondary" onclick="closeEditModal()">取消</button>
+                <button class="btn btn-primary" onclick="saveEdit()">保存修改</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // 全局变量
+        let currentTaskId = '';
+        let subtitles = [];
+        let editingIndex = -1;
+
+        // 加载字幕数据
+        async function loadSubtitles() {
+            const taskId = document.getElementById('taskIdInput').value.trim();
+            if (!taskId) {
+                showError('请输入任务ID');
+                return;
+            }
+
+            showLoading(true);
+            hideAlerts();
+
+            try {
+                const response = await fetch(`/api/subtitle-editor/load?taskId=${taskId}`);
+                const data = await response.json();
+
+                currentTaskId = taskId;
+                subtitles = data.subtitles;
+
+                // 更新界面
+                document.getElementById('taskIdDisplay').textContent = taskId;
+                document.getElementById('totalDuration').textContent = data.totalDuration.toFixed(1);
+                document.getElementById('subtitleCount').textContent = subtitles.length;
+
+                renderSubtitleTable();
+                
+                document.getElementById('emptyState').style.display = 'none';
+                document.getElementById('subtitleTable').style.display = 'table';
+                document.getElementById('saveBtn').disabled = false;
+                document.getElementById('regenerateBtn').disabled = false;
+
+                showSuccess(`成功加载 ${subtitles.length} 条字幕`);
+            } catch (error) {
+                showError('加载字幕失败: ' + error.message);
+            } finally {
+                showLoading(false);
+            }
+        }
+
+        // 渲染字幕表格
+        function renderSubtitleTable() {
+            const tbody = document.getElementById('subtitleTableBody');
+            tbody.innerHTML = '';
+
+            subtitles.forEach((subtitle, index) => {
+                const row = tbody.insertRow();
+                row.innerHTML = `
+                    <td>${subtitle.id}</td>
+                    <td class="subtitle-text" title="${subtitle.text}">${subtitle.text}</td>
+                    <td class="subtitle-time">${subtitle.startTime.toFixed(1)}s</td>
+                    <td class="subtitle-time">${subtitle.duration.toFixed(1)}s</td>
+                    <td>
+                        <button class="btn-edit" onclick="openEditModal(${index})">编辑</button>
+                    </td>
+                `;
+            });
+        }
+
+        // 打开编辑对话框
+        function openEditModal(index) {
+            editingIndex = index;
+            const subtitle = subtitles[index];
+
+            document.getElementById('editSubtitleId').textContent = subtitle.id;
+            document.getElementById('editText').value = subtitle.text;
+            document.getElementById('editStartTime').value = subtitle.startTime;
+            document.getElementById('editDuration').value = subtitle.duration;
+            document.getElementById('editFontName').value = subtitle.style.fontName;
+            document.getElementById('editFontSize').value = subtitle.style.fontSize;
+            document.getElementById('editFontColor').value = subtitle.style.fontColor;
+            document.getElementById('editBorderColor').value = subtitle.style.borderColor;
+            document.getElementById('editBorderWidth').value = subtitle.style.borderWidth;
+            document.getElementById('editAnimationType').value = subtitle.style.animationType;
+
+            document.getElementById('editModal').style.display = 'block';
+        }
+
+        // 关闭编辑对话框
+        function closeEditModal() {
+            document.getElementById('editModal').style.display = 'none';
+            editingIndex = -1;
+        }
+
+        // 保存编辑
+        function saveEdit() {
+            const subtitle = subtitles[editingIndex];
+
+            subtitle.text = document.getElementById('editText').value;
+            subtitle.startTime = parseFloat(document.getElementById('editStartTime').value);
+            subtitle.duration = parseFloat(document.getElementById('editDuration').value);
+            subtitle.style.fontName = document.getElementById('editFontName').value;
+            subtitle.style.fontSize = parseInt(document.getElementById('editFontSize').value);
+            subtitle.style.fontColor = document.getElementById('editFontColor').value;
+            subtitle.style.borderColor = document.getElementById('editBorderColor').value;
+            subtitle.style.borderWidth = parseInt(document.getElementById('editBorderWidth').value);
+            subtitle.style.animationType = document.getElementById('editAnimationType').value;
+
+            renderSubtitleTable();
+            closeEditModal();
+            showSuccess('字幕修改已保存（本地），点击"保存修改"按钮提交到服务器');
+        }
+
+        // 保存字幕到服务器
+        async function saveSubtitles() {
+            showLoading(true);
+            hideAlerts();
+
+            try {
+                const response = await fetch('/api/subtitle-editor/update', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        taskId: currentTaskId,
+                        subtitles: subtitles,
+                        regenerateVideo: false
+                    })
+                });
+
+                const result = await response.json();
+
+                if (result.success) {
+                    showSuccess(result.message);
+                } else {
+                    showError(result.message);
+                }
+            } catch (error) {
+                showError('保存失败: ' + error.message);
+            } finally {
+                showLoading(false);
+            }
+        }
+
+        // 重新生成视频
+        async function regenerateVideo() {
+            if (!confirm('确定要重新生成视频吗？这可能需要30-60秒')) {
+                return;
+            }
+
+            showLoading(true);
+            hideAlerts();
+
+            try {
+                // 先保存字幕
+                const updateResponse = await fetch('/api/subtitle-editor/update', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        taskId: currentTaskId,
+                        subtitles: subtitles,
+                        regenerateVideo: true
+                    })
+                });
+
+                const result = await updateResponse.json();
+
+                if (result.success) {
+                    showSuccess(`${result.message}，耗时${result.duration.toFixed(2)}秒`);
+                    
+                    // 显示下载按钮
+                    showDownloadButton(result.videoUrl);
+                } else {
+                    showError(result.message);
+                }
+            } catch (error) {
+                showError('重新生成视频失败: ' + error.message);
+            } finally {
+                showLoading(false);
+            }
+        }
+
+        // 显示下载按钮
+        function showDownloadButton(videoUrl) {
+            const successAlert = document.getElementById('successAlert');
+            const downloadBtn = `
+                <div style="margin-top: 15px;">
+                    <button onclick="downloadNewVideo('${videoUrl}')" 
+                            style="padding: 10px 20px; background: #28a745; color: white; border: none; border-radius: 5px; cursor: pointer; font-size: 14px;">
+                        📥 下载新视频
+                    </button>
+                    <button onclick="previewNewVideo('${videoUrl}')" 
+                            style="padding: 10px 20px; background: #007bff; color: white; border: none; border-radius: 5px; cursor: pointer; font-size: 14px; margin-left: 10px;">
+                        🎬 在线播放
+                    </button>
+                </div>
+            `;
+            successAlert.innerHTML += downloadBtn;
+        }
+
+        // 下载新视频
+        function downloadNewVideo(videoUrl) {
+            const a = document.createElement('a');
+            a.href = videoUrl;
+            a.download = `${currentTaskId}_edited.mp4`;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+        }
+
+        // 在线播放新视频
+        function previewNewVideo(videoUrl) {
+            window.open(videoUrl, '_blank');
+        }
+
+        // 显示成功提示
+        function showSuccess(message) {
+            const alert = document.getElementById('successAlert');
+            alert.textContent = message;
+            alert.style.display = 'block';
+            setTimeout(() => { alert.style.display = 'none'; }, 5000);
+        }
+
+        // 显示错误提示
+        function showError(message) {
+            const alert = document.getElementById('errorAlert');
+            alert.textContent = message;
+            alert.style.display = 'block';
+            setTimeout(() => { alert.style.display = 'none'; }, 5000);
+        }
+
+        // 隐藏所有提示
+        function hideAlerts() {
+            document.getElementById('successAlert').style.display = 'none';
+            document.getElementById('errorAlert').style.display = 'none';
+        }
+
+        // 显示/隐藏加载状态
+        function showLoading(show) {
+            document.getElementById('loading').style.display = show ? 'block' : 'none';
+        }
+
+        // 点击模态框外部关闭
+        window.onclick = function(event) {
+            const modal = document.getElementById('editModal');
+            if (event.target == modal) {
+                closeEditModal();
+            }
+        }
+
+        // 页面加载时自动读取URL参数
+        window.addEventListener('DOMContentLoaded', function() {
+            const urlParams = new URLSearchParams(window.location.search);
+            const taskIdFromUrl = urlParams.get('taskId');
+            
+            if (taskIdFromUrl) {
+                document.getElementById('taskIdInput').value = taskIdFromUrl;
+                // 自动加载字幕
+                setTimeout(() => {
+                    loadSubtitles();
+                }, 500);
+            }
+        });
+    </script>
+</body>
+</html>
