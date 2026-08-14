@@ -213,6 +213,369 @@
         @keyframes spin {
             to { transform: rotate(360deg); }
         }
+
+        /* ========== 专业版字幕编辑器样式 ========== */
+        .subtitle-editor-pro {
+            background: #1a1a1a;
+            border-radius: 20px 20px 0 0;
+            overflow: hidden;
+        }
+
+        .pro-btn {
+            padding: 8px 16px;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: 500;
+            transition: all 0.2s;
+        }
+
+        .pro-btn-primary {
+            background: #667eea;
+            color: white;
+        }
+
+        .pro-btn-primary:hover {
+            background: #5568d3;
+        }
+
+        .pro-btn-success {
+            background: #28a745;
+            color: white;
+        }
+
+        .pro-btn-success:hover {
+            background: #218838;
+        }
+
+        .pro-btn-secondary {
+            background: #6c757d;
+            color: white;
+        }
+
+        .pro-btn-secondary:hover {
+            background: #5a6268;
+        }
+
+        /* 主内容区域 */
+        .pro-main-container {
+            display: flex;
+            height: 700px;
+        }
+
+        /* 左侧：视频预览区 */
+        .pro-preview-panel {
+            flex: 1;
+            background: #000;
+            display: flex;
+            flex-direction: column;
+            min-width: 640px;
+        }
+
+        .pro-video-container {
+            flex: 1;
+            position: relative;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: #000;
+        }
+
+        #editorVideo {
+            max-width: 100%;
+            max-height: 100%;
+        }
+
+        #subtitleCanvas {
+            position: absolute;
+            top: 0;
+            left: 0;
+            pointer-events: none;
+        }
+
+        /* 视频控制栏 */
+        .pro-video-controls {
+            height: 80px;
+            background: #2a2a2a;
+            border-top: 1px solid #3a3a3a;
+            padding: 15px 20px;
+        }
+
+        .pro-progress-bar {
+            width: 100%;
+            height: 6px;
+            background: #3a3a3a;
+            border-radius: 3px;
+            margin-bottom: 15px;
+            cursor: pointer;
+            position: relative;
+        }
+
+        .pro-progress-fill {
+            height: 100%;
+            background: #667eea;
+            border-radius: 3px;
+            width: 0%;
+            transition: width 0.1s;
+        }
+
+        .pro-progress-handle {
+            position: absolute;
+            top: 50%;
+            transform: translate(-50%, -50%);
+            width: 14px;
+            height: 14px;
+            background: #fff;
+            border-radius: 50%;
+            cursor: pointer;
+            left: 0%;
+        }
+
+        .pro-control-buttons {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+        }
+
+        .pro-control-btn {
+            width: 36px;
+            height: 36px;
+            background: #3a3a3a;
+            border: none;
+            border-radius: 5px;
+            color: #e0e0e0;
+            cursor: pointer;
+            font-size: 18px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.2s;
+        }
+
+        .pro-control-btn:hover {
+            background: #4a4a4a;
+        }
+
+        .pro-time-display {
+            color: #999;
+            font-family: 'Courier New', monospace;
+            font-size: 14px;
+        }
+
+        /* 右侧：编辑面板 */
+        .pro-edit-panel {
+            width: 450px;
+            background: #2a2a2a;
+            border-left: 1px solid #3a3a3a;
+            display: flex;
+            flex-direction: column;
+        }
+
+        /* 字幕列表 */
+        .pro-subtitle-list {
+            flex: 1;
+            overflow-y: auto;
+            padding: 15px;
+        }
+
+        .pro-subtitle-item {
+            background: #1a1a1a;
+            border: 2px solid transparent;
+            border-radius: 8px;
+            padding: 12px;
+            margin-bottom: 10px;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .pro-subtitle-item:hover {
+            background: #252525;
+        }
+
+        .pro-subtitle-item.active {
+            border-color: #667eea;
+            background: #252525;
+        }
+
+        .pro-subtitle-item-header {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 8px;
+        }
+
+        .pro-subtitle-id {
+            color: #999;
+            font-size: 13px;
+        }
+
+        .pro-subtitle-time {
+            color: #667eea;
+            font-size: 12px;
+            font-family: 'Courier New', monospace;
+        }
+
+        .pro-subtitle-text {
+            color: #e0e0e0;
+            font-size: 14px;
+            line-height: 1.5;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+
+        /* 样式编辑器 */
+        .pro-style-editor {
+            height: 400px;
+            border-top: 1px solid #3a3a3a;
+            padding: 20px;
+            overflow-y: auto;
+        }
+
+        .pro-form-group {
+            margin-bottom: 20px;
+        }
+
+        .pro-form-group label {
+            display: block;
+            color: #999;
+            font-size: 13px;
+            margin-bottom: 8px;
+        }
+
+        .pro-form-group input,
+        .pro-form-group select,
+        .pro-form-group textarea {
+            width: 100%;
+            padding: 8px 12px;
+            background: #1a1a1a;
+            border: 1px solid #3a3a3a;
+            border-radius: 5px;
+            color: #e0e0e0;
+            font-size: 14px;
+        }
+
+        .pro-form-group input:focus,
+        .pro-form-group select:focus,
+        .pro-form-group textarea:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+
+        .pro-form-group textarea {
+            resize: vertical;
+            min-height: 60px;
+            font-family: 'Microsoft YaHei', Arial, sans-serif;
+        }
+
+        .pro-form-row {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 15px;
+        }
+
+        /* 字体大小滑块 */
+        .pro-form-group input[type="range"] {
+            -webkit-appearance: none;
+            width: 100%;
+            height: 6px;
+            background: #3a3a3a;
+            border-radius: 3px;
+            outline: none;
+        }
+
+        .pro-form-group input[type="range"]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            width: 16px;
+            height: 16px;
+            background: #667eea;
+            border-radius: 50%;
+            cursor: pointer;
+        }
+
+        .pro-form-group input[type="range"]::-moz-range-thumb {
+            width: 16px;
+            height: 16px;
+            background: #667eea;
+            border-radius: 50%;
+            cursor: pointer;
+            border: none;
+        }
+
+        .pro-slider-value {
+            display: inline-block;
+            background: #3a3a3a;
+            padding: 4px 10px;
+            border-radius: 3px;
+            font-size: 13px;
+            color: #e0e0e0;
+            margin-left: 10px;
+        }
+
+        /* 颜色选择器 */
+        .pro-form-group input[type="color"] {
+            width: 100%;
+            height: 40px;
+            border: 1px solid #3a3a3a;
+            border-radius: 5px;
+            cursor: pointer;
+        }
+
+        /* 位置九宫格 */
+        .pro-position-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 8px;
+            margin-top: 10px;
+        }
+
+        .pro-position-btn {
+            aspect-ratio: 1;
+            background: #1a1a1a;
+            border: 2px solid #3a3a3a;
+            border-radius: 5px;
+            cursor: pointer;
+            transition: all 0.2s;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: #666;
+            font-size: 20px;
+        }
+
+        .pro-position-btn:hover {
+            background: #252525;
+            border-color: #4a4a4a;
+        }
+
+        .pro-position-btn.active {
+            background: #667eea;
+            border-color: #667eea;
+            color: #fff;
+        }
+
+        /* 专业版滚动条样式 */
+        .pro-subtitle-list::-webkit-scrollbar,
+        .pro-style-editor::-webkit-scrollbar {
+            width: 8px;
+            height: 8px;
+        }
+
+        .pro-subtitle-list::-webkit-scrollbar-track,
+        .pro-style-editor::-webkit-scrollbar-track {
+            background: #1a1a1a;
+        }
+
+        .pro-subtitle-list::-webkit-scrollbar-thumb,
+        .pro-style-editor::-webkit-scrollbar-thumb {
+            background: #3a3a3a;
+            border-radius: 4px;
+        }
+
+        .pro-subtitle-list::-webkit-scrollbar-thumb:hover,
+        .pro-style-editor::-webkit-scrollbar-thumb:hover {
+            background: #4a4a4a;
+        }
     </style>
 </head>
 <body>
@@ -404,9 +767,145 @@
                     <button class="download-btn" onclick="downloadVideo()">
                         📥 下载视频
                     </button>
-                    <button class="download-btn" onclick="editSubtitles()" style="background: #667eea;">
+                    <button id="editSubtitlesBtn" class="download-btn" onclick="editSubtitles()" style="background: #667eea;">
                         ✏️ 编辑字幕
                     </button>
+                </div>
+            </div>
+
+            <!-- 字幕编辑区域（默认隐藏，专业版UI） -->
+            <div id="subtitleEditorSection" class="subtitle-editor-pro" style="display: none; margin-top: 30px; border-top: 2px solid #667eea;">
+                <div style="background: #2a2a2a; padding: 15px 30px; display: flex; justify-content: space-between; align-items: center;">
+                    <h2 style="color: #fff; font-size: 20px; margin: 0;">🎬 字幕编辑器专业版</h2>
+                    <div style="display: flex; gap: 10px;">
+                        <button onclick="saveAllSubtitles()" class="pro-btn pro-btn-success">
+                            💾 保存所有修改
+                        </button>
+                        <button onclick="regenerateVideo()" class="pro-btn pro-btn-primary">
+                            🎥 重新生成视频
+                        </button>
+                        <button onclick="toggleSubtitleEditor()" class="pro-btn pro-btn-secondary">
+                            ❌ 关闭编辑器
+                        </button>
+                    </div>
+                </div>
+                
+                <!-- 主编辑区域 -->
+                <div class="pro-main-container">
+                    <!-- 左侧：视频预览区 -->
+                    <div class="pro-preview-panel">
+                        <div class="pro-video-container">
+                            <video id="editorVideo" crossorigin="anonymous"></video>
+                            <canvas id="subtitleCanvas"></canvas>
+                        </div>
+                        
+                        <!-- 视频控制栏 -->
+                        <div class="pro-video-controls">
+                            <div class="pro-progress-bar" id="editorProgressBar">
+                                <div class="pro-progress-fill" id="editorProgressFill"></div>
+                                <div class="pro-progress-handle" id="editorProgressHandle"></div>
+                            </div>
+                            <div class="pro-control-buttons">
+                                <button class="pro-control-btn" id="editorPlayBtn" onclick="editorTogglePlay()">▶</button>
+                                <button class="pro-control-btn" onclick="editorSkipBackward()">⏪</button>
+                                <button class="pro-control-btn" onclick="editorSkipForward()">⏩</button>
+                                <span class="pro-time-display" id="editorTimeDisplay">0:00 / 0:00</span>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- 右侧：字幕轨道面板 -->
+                    <div class="pro-edit-panel">
+                        <!-- 字幕列表 -->
+                        <div class="pro-subtitle-list" id="proSubtitleList">
+                            <div style="color: #666; text-align: center; padding: 40px 20px;">
+                                <p>暂无字幕</p>
+                            </div>
+                        </div>
+                        
+                        <!-- 样式编辑器 -->
+                        <div class="pro-style-editor" id="proStyleEditor" style="display: none;">
+                            <h3 style="color: #fff; font-size: 16px; margin-bottom: 20px;">
+                                编辑字幕 - 序号 <span id="proEditSubtitleId">-</span>
+                            </h3>
+                            
+                            <div class="pro-form-group">
+                                <label>文本内容</label>
+                                <textarea id="proEditText" maxlength="100" oninput="onProStyleChange()"></textarea>
+                            </div>
+                            
+                            <div class="pro-form-row">
+                                <div class="pro-form-group">
+                                    <label>开始时间（秒）</label>
+                                    <input type="number" id="proEditStartTime" step="0.1" min="0" oninput="onProStyleChange()" />
+                                </div>
+                                <div class="pro-form-group">
+                                    <label>持续时间（秒）</label>
+                                    <input type="number" id="proEditDuration" step="0.1" min="0.1" oninput="onProStyleChange()" />
+                                </div>
+                            </div>
+                            
+                            <div class="pro-form-group">
+                                <label>字体名称</label>
+                                <select id="proEditFontName" onchange="onProStyleChange()">
+                                    <option value="Microsoft YaHei">微软雅黑</option>
+                                    <option value="SimHei">黑体</option>
+                                    <option value="SimSun">宋体</option>
+                                    <option value="Arial">Arial</option>
+                                </select>
+                            </div>
+                            
+                            <div class="pro-form-group">
+                                <label>字体大小 <span class="pro-slider-value" id="proFontSizeValue">64</span></label>
+                                <input type="range" id="proEditFontSize" min="24" max="96" value="64" oninput="onProFontSizeChange()" />
+                            </div>
+                            
+                            <div class="pro-form-row">
+                                <div class="pro-form-group">
+                                    <label>字体颜色</label>
+                                    <input type="color" id="proEditFontColor" value="#FFFFFF" onchange="onProStyleChange()" />
+                                </div>
+                                <div class="pro-form-group">
+                                    <label>边框颜色</label>
+                                    <input type="color" id="proEditBorderColor" value="#000000" onchange="onProStyleChange()" />
+                                </div>
+                            </div>
+                            
+                            <div class="pro-form-group">
+                                <label>边框粗细</label>
+                                <input type="range" id="proEditBorderWidth" min="1" max="5" value="3" oninput="onProStyleChange()" />
+                            </div>
+                            
+                            <div class="pro-form-group">
+                                <label>字幕位置</label>
+                                <div class="pro-position-grid" id="proPositionGrid">
+                                    <div class="pro-position-btn" data-position="7" onclick="setProPosition(7)">↖</div>
+                                    <div class="pro-position-btn" data-position="8" onclick="setProPosition(8)">↑</div>
+                                    <div class="pro-position-btn" data-position="9" onclick="setProPosition(9)">↗</div>
+                                    <div class="pro-position-btn" data-position="4" onclick="setProPosition(4)">←</div>
+                                    <div class="pro-position-btn" data-position="5" onclick="setProPosition(5)">●</div>
+                                    <div class="pro-position-btn" data-position="6" onclick="setProPosition(6)">→</div>
+                                    <div class="pro-position-btn" data-position="1" onclick="setProPosition(1)">↙</div>
+                                    <div class="pro-position-btn" data-position="2" onclick="setProPosition(2)">↓</div>
+                                    <div class="pro-position-btn" data-position="3" onclick="setProPosition(3)">↘</div>
+                                </div>
+                            </div>
+                            
+                            <div class="pro-form-group">
+                                <label>动画效果</label>
+                                <select id="proEditAnimationType" onchange="onProStyleChange()">
+                                    <option value="fade">渐入渐出</option>
+                                    <option value="slide_up">从下飞入</option>
+                                    <option value="slide_down">从上飞入</option>
+                                    <option value="slide_left">从左飞入</option>
+                                    <option value="slide_right">从右飞入</option>
+                                    <option value="zoom_in">缩放进入</option>
+                                    <option value="bounce">弹跳效果</option>
+                                    <option value="none">无动画</option>
+                                </select>
+                            </div>
+                        </div>
+                    </div>
                 </div>
             </div>
         </div>
@@ -525,16 +1024,23 @@
             document.body.removeChild(a);
         }
 
-        // 编辑字幕
+        // 编辑字幕 - 跳转到专业版
         function editSubtitles() {
             if (!window.currentTaskId) {
                 showStatus('请先生成视频', 'error');
                 return;
             }
             
-            // 打开字幕编辑器页面，并传递taskId
-            const url = `/subtitle-editor.html?taskId=${window.currentTaskId}`;
+            // 跳转到专业版字幕编辑器页面
+            const url = `/subtitle-editor-pro.html?taskId=${window.currentTaskId}`;
             window.open(url, '_blank');
+        }
+
+        // 切换字幕编辑器显示/隐藏（方案A的代码，暂时不用）
+        async function toggleSubtitleEditor() {
+            // 这个函数现在不需要了，因为我们直接跳转到专业版页面
+            // 如果以后要用方案A（在当前页面展开），可以再启用
+            editSubtitles();
         }
 
         // 复制TaskID
@@ -545,5 +1051,7 @@
             showStatus('任务ID已复制到剪贴板！', 'success');
         }
     </script>
+    <!-- 引入专业版字幕编辑器 -->
+    <script src="subtitle-editor-integrated.js"></script>
 </body>
 </html>
