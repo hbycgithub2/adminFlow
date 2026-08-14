@@ -500,8 +500,8 @@ public class DocumentTTSServiceImpl implements DocumentTTSService {
         for (MergedSegment segment : segments) {
             CompletableFuture<AudioSegment> future = CompletableFuture.supplyAsync(() -> {
                 try {
-                    log.debug("开始生成音频，音色: {}, 文本长度: {}", 
-                            segment.getSpeaker(), segment.getText().length());
+                    log.debug("开始生成音频，音色: {}, 文本长度: {}, 文本内容: [{}]", 
+                            segment.getSpeaker(), segment.getText().length(), segment.getText());
                     
                     TTSRequest request = TTSRequest.builder()
                             .text(segment.getText())
@@ -517,8 +517,9 @@ public class DocumentTTSServiceImpl implements DocumentTTSService {
                     return new AudioSegment(audio, segment);
                     
                 } catch (Exception e) {
-                    log.error("TTS合成失败: {}", e.getMessage());
-                    throw new RuntimeException("TTS合成失败: " + e.getMessage(), e);
+                    log.error("TTS合成失败，文本: [{}], 错误: {}", segment.getText(), e.getMessage());
+                    // ✅ 关键修改：返回null而不是抛异常，让其他片段继续处理
+                    return null;
                 }
             }, executor);
             
@@ -528,10 +529,19 @@ public class DocumentTTSServiceImpl implements DocumentTTSService {
         // 等待所有任务完成
         CompletableFuture.allOf(futures.toArray(new CompletableFuture[0])).join();
         
-        // 收集结果（保持原始顺序）
+        // 收集结果（保持原始顺序，过滤null）
         List<AudioSegment> results = new ArrayList<>();
         for (CompletableFuture<AudioSegment> future : futures) {
-            results.add(future.get());
+            try {
+                AudioSegment segment = future.get();
+                if (segment != null) {
+                    results.add(segment);
+                } else {
+                    log.warn("跳过失败的TTS片段");
+                }
+            } catch (Exception e) {
+                log.warn("某个TTS请求失败: {}", e.getMessage());
+            }
         }
         
         log.info("并发TTS合成完成，共生成{}个音频片段", results.size());
@@ -576,5 +586,83 @@ public class DocumentTTSServiceImpl implements DocumentTTSService {
         if (file.getSize() > 10 * 1024 * 1024) {
             throw new Exception("文件大小不能超过10MB");
         }
+    }
+    
+    @Override
+    public byte[] generateSpeechFromDocument(MultipartFile file, String boldVoice, String normalVoice, 
+                                            String format, Integer sampleRate) throws Exception {
+        // 构建音色配置
+        VoiceConfig voiceConfig = VoiceConfig.builder()
+                .boldVoice(boldVoice)
+                .normalVoice(normalVoice)
+                .format(format)
+                .sampleRate(sampleRate)
+                .build();
+        
+        return generateDocumentSpeechBytes(file, voiceConfig);
+    }
+    
+    @Override
+    public List<DialogSegment> getDialogSegments(MultipartFile file, String boldVoice, String normalVoice) throws Exception {
+        log.info("开始获取对话片段：文件名={}", file.getOriginalFilename());
+        
+        // 构建音色配置
+        VoiceConfig voiceConfig = VoiceConfig.builder()
+                .boldVoice(boldVoice)
+                .normalVoice(normalVoice)
+                .build();
+        
+        // 步骤1：解析Word文档
+        List<TextSegment> segments = documentParser.parse(file.getInputStream(), voiceConfig);
+        log.info("文档解析完成，共{}个文本片段", segments.size());
+        
+        // 步骤2：使用独立模式（与generateDocumentSpeechWithTiming保持一致）
+        List<MergedSegment> independentSegments = segmentMerger.mergeNoMerge(segments);
+        log.info("独立模式处理完成，共{}个独立片段", independentSegments.size());
+        
+        // 步骤3：拆分过长片段
+        List<MergedSegment> finalSegments = new ArrayList<>();
+        for (MergedSegment segment : independentSegments) {
+            List<MergedSegment> split = segmentMerger.splitIfTooLong(segment, MAX_TEXT_LENGTH);
+            finalSegments.addAll(split);
+        }
+        log.info("拆分后共{}个片段", finalSegments.size());
+        
+        // 步骤4：估算每个片段的时长
+        List<DialogSegment> dialogSegments = new ArrayList<>();
+        double currentTime = 0.0;
+        
+        for (int i = 0; i < finalSegments.size(); i++) {
+            MergedSegment segment = finalSegments.get(i);
+            MergedSegment nextSegment = (i < finalSegments.size() - 1) ? finalSegments.get(i + 1) : null;
+            
+            // 估算文本语音时长（平均每字0.3秒）
+            double textDuration = segment.getText().length() * 0.3;
+            
+            // 计算停顿时长
+            int pauseDuration = pauseCalculator.calculatePause(segment, nextSegment);
+            double pauseSec = pauseDuration / 1000.0;
+            
+            // 获取是否加粗（从原始片段中获取）
+            Boolean isBold = segment.getOriginalSegments().isEmpty() ? 
+                             false : segment.getOriginalSegments().get(0).getIsBold();
+            
+            // 创建对话片段
+            DialogSegment dialogSegment = DialogSegment.builder()
+                    .text(segment.getText())
+                    .isBold(isBold)
+                    .voiceId(segment.getSpeaker())
+                    .startTime(currentTime)
+                    .duration(textDuration + pauseSec)
+                    .build();
+            
+            dialogSegments.add(dialogSegment);
+            
+            currentTime += dialogSegment.getDuration();
+        }
+        
+        log.info("对话片段生成完成，共{}个片段，总时长{}秒", dialogSegments.size(), currentTime);
+        
+        return dialogSegments;
     }
 }
