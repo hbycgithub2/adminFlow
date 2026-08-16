@@ -283,9 +283,18 @@ public class DocumentTTSServiceImpl implements DocumentTTSService {
             List<CharTiming> charTimings = new ArrayList<>();
             double actualLineDuration = 0.0;  // ← Day 6新增：记录WhisperX实际时长
             
-            // 如果当前行没有音频片段，直接使用智能算法
-            if (lineAudioSegments.isEmpty()) {
-                log.warn("[WhisperX] 当前行没有音频片段，跳过WhisperX对齐，使用智能算法");
+            // 如果当前行没有音频片段，或者所有音频片段都是失败的（空音频），直接使用智能算法
+            boolean hasValidAudio = false;
+            for (AudioSegment seg : lineAudioSegments) {
+                if (seg.getAudioData() != null && seg.getAudioData().length > 0) {
+                    hasValidAudio = true;
+                    break;
+                }
+            }
+            
+            if (lineAudioSegments.isEmpty() || !hasValidAudio) {
+                log.warn("[WhisperX] 当前行「{}」没有有效音频片段，跳过WhisperX对齐，使用智能算法", 
+                         line.text.length() > 20 ? line.text.substring(0, 20) + "..." : line.text);
                 actualLineDuration = lineDuration;  // 回退到FFprobe时长
                 charTimings = buildCharTimings(line.text, currentTime, actualLineDuration);
             } else {
@@ -300,6 +309,12 @@ public class DocumentTTSServiceImpl implements DocumentTTSService {
                 int segmentIndex = 0;
                 for (AudioSegment audioSegment : lineAudioSegments) {
                     segmentIndex++;
+                    
+                    // ✅ Day 9新增：跳过空音频（TTS失败的段落）
+                    if (audioSegment.getAudioData() == null || audioSegment.getAudioData().length == 0) {
+                        log.warn("[WhisperX] Segment {} 音频为空（TTS失败），跳过", segmentIndex);
+                        continue;
+                    }
                     
                     // 获取segment对应的文本
                     String segmentText = audioSegment.getMergedSegment().getText();
@@ -468,17 +483,27 @@ public class DocumentTTSServiceImpl implements DocumentTTSService {
      */
     private byte[] mergeLineAudioSegments(List<AudioSegment> audioSegments, VoiceConfig voiceConfig) {
         try {
-            // ✅ 只合并纯语音，不添加停顿（WhisperX需要纯语音）
+            // ✅ Day 9修复：只合并有效的纯语音，过滤空音频（TTS失败的）
             List<byte[]> pureAudioList = new ArrayList<>();
             for (AudioSegment segment : audioSegments) {
-                pureAudioList.add(segment.getAudioData());
+                if (segment.getAudioData() != null && segment.getAudioData().length > 0) {
+                    pureAudioList.add(segment.getAudioData());
+                } else {
+                    log.debug("[WhisperX] 跳过空音频segment: {}", 
+                             segment.getMergedSegment().getText());
+                }
+            }
+            
+            if (pureAudioList.isEmpty()) {
+                log.warn("[WhisperX] 所有音频segment都是空的，无法合并");
+                return null;
             }
             
             // 使用简单合并（无停顿）
             byte[] mergedAudio = audioMerger.mergeSimple(pureAudioList);
             
             log.debug("[WhisperX] 合并了{}个纯语音片段（无停顿），总大小：{} KB", 
-                     audioSegments.size(), mergedAudio.length / 1024.0);
+                     pureAudioList.size(), mergedAudio.length / 1024.0);
             
             return mergedAudio;
             
@@ -1009,9 +1034,11 @@ public class DocumentTTSServiceImpl implements DocumentTTSService {
                     return audioSegment;
                     
                 } catch (Exception e) {
-                    log.error("TTS合成失败，文本: [{}], 错误: {}", segment.getText(), e.getMessage());
-                    // ✅ 关键修改：返回null而不是抛异常，让其他片段继续处理
-                    return null;
+                    log.error("❌ TTS合成失败，文本: [{}], 错误: {}", segment.getText(), e.getMessage());
+                    // ✅ Day 9修复：不返回null，返回空音频占位，保持与原始segment的一一对应
+                    AudioSegment emptySegment = new AudioSegment(new byte[0], segment);
+                    emptySegment.setAccurateDuration(0.0);
+                    return emptySegment;
                 }
             }, executor);
             
@@ -1021,18 +1048,20 @@ public class DocumentTTSServiceImpl implements DocumentTTSService {
         // 等待所有任务完成
         CompletableFuture.allOf(futures.toArray(new CompletableFuture[0])).join();
         
-        // 收集结果（保持原始顺序，过滤null）
+        // 收集结果（保持原始顺序，不过滤）
         List<AudioSegment> results = new ArrayList<>();
         for (CompletableFuture<AudioSegment> future : futures) {
             try {
                 AudioSegment segment = future.get();
-                if (segment != null) {
-                    results.add(segment);
-                } else {
-                    log.warn("跳过失败的TTS片段");
+                // ✅ Day 9修复：保留所有segment，包括失败的（空音频）
+                results.add(segment);
+                if (segment.getAudioData().length == 0) {
+                    log.warn("⚠️ TTS片段失败，文本: [{}]，将跳过此行的WhisperX对齐", 
+                             segment.getMergedSegment().getText());
                 }
             } catch (Exception e) {
-                log.warn("某个TTS请求失败: {}", e.getMessage());
+                log.error("❌ TTS请求异常: {}", e.getMessage());
+                // 理论上不会到这里，因为异常已经在CompletableFuture中处理了
             }
         }
         
