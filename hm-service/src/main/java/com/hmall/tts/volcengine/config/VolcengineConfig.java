@@ -43,12 +43,12 @@ public class VolcengineConfig {
     /**
      * 连接超时时间（秒）
      */
-    private int connectTimeout = 30;
+    private int connectTimeout = 15;  // 从30秒缩短到15秒
 
     /**
      * 请求超时时间（分钟）
      */
-    private int requestTimeout = 5;
+    private int requestTimeout = 2;  // 从5分钟缩短到2分钟
 
     /**
      * 默认音色

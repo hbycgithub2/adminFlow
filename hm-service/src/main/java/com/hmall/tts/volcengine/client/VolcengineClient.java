@@ -40,6 +40,9 @@ public class VolcengineClient {
     private static final Pattern CODE_PATTERN = Pattern.compile("\"code\"\\s*:\\s*(-?\\d+)");
     private static final Pattern DATA_PATTERN = Pattern.compile("\"data\"\\s*:\\s*\"([^\"]*)\"");
     
+    // ✅ 复用HttpClient，避免连接池耗尽
+    private volatile HttpClient sharedHttpClient;
+    
     /**
      * 创建一个信任所有证书的SSLContext
      * 注意：生产环境中应该使用正确的证书验证
@@ -68,7 +71,32 @@ public class VolcengineClient {
     }
     
     /**
-     * 发送 TTS 请求并获取音频数据
+     * 获取或创建共享的HttpClient实例（双检锁单例）
+     */
+    private HttpClient getOrCreateHttpClient() {
+        if (sharedHttpClient == null) {
+            synchronized (this) {
+                if (sharedHttpClient == null) {
+                    SSLContext sslContext = createTrustAllSSLContext();
+                    HttpClient.Builder clientBuilder = HttpClient.newBuilder()
+                            .connectTimeout(Duration.ofSeconds(config.getConnectTimeout()))
+                            .version(HttpClient.Version.HTTP_1_1)
+                            .followRedirects(HttpClient.Redirect.NORMAL);
+                    
+                    if (sslContext != null) {
+                        clientBuilder.sslContext(sslContext);
+                        log.info("✅ 已创建共享HttpClient实例");
+                    }
+                    
+                    sharedHttpClient = clientBuilder.build();
+                }
+            }
+        }
+        return sharedHttpClient;
+    }
+    
+    /**
+     * 发送 TTS 请求并获取音频数据（带重试机制）
      * 
      * @param payload JSON 格式的请求体
      * @param speaker 音色ID（用于选择Resource ID）
@@ -76,6 +104,32 @@ public class VolcengineClient {
      * @throws Exception 请求失败时抛出异常
      */
     public byte[] sendTTSRequest(String payload, String speaker) throws Exception {
+        int maxRetries = 2;  // 最多重试2次
+        Exception lastException = null;
+        
+        for (int attempt = 1; attempt <= maxRetries + 1; attempt++) {
+            try {
+                if (attempt > 1) {
+                    log.warn("第{}次重试...", attempt - 1);
+                    Thread.sleep(1000 * attempt);  // 递增等待：1s, 2s, 3s
+                }
+                return sendTTSRequestInternal(payload, speaker);
+            } catch (Exception e) {
+                lastException = e;
+                if (attempt <= maxRetries) {
+                    log.warn("第{}次请求失败: {}，将重试", attempt, e.getMessage());
+                } else {
+                    log.error("所有重试失败（共{}次），最终失败: {}", maxRetries + 1, e.getMessage());
+                }
+            }
+        }
+        throw lastException;
+    }
+    
+    /**
+     * 发送 TTS 请求的内部实现
+     */
+    private byte[] sendTTSRequestInternal(String payload, String speaker) throws Exception {
         log.info("发送TTS请求，payload长度: {}, 音色: {}", payload.length(), speaker);
         log.info("API URL: {}", config.getUrl());
         log.info("API Key 长度: {}", config.getApiKey().length());
@@ -85,19 +139,8 @@ public class VolcengineClient {
         log.info("选择的 Resource ID: {}", resourceId);
         
         try {
-            // 创建 HTTP 客户端（使用自定义SSLContext）
-            SSLContext sslContext = createTrustAllSSLContext();
-            HttpClient.Builder clientBuilder = HttpClient.newBuilder()
-                    .connectTimeout(Duration.ofSeconds(config.getConnectTimeout()))
-                    .version(HttpClient.Version.HTTP_1_1)  // 使用 HTTP/1.1
-                    .followRedirects(HttpClient.Redirect.NORMAL);
-            
-            if (sslContext != null) {
-                clientBuilder.sslContext(sslContext);
-                log.info("已配置自定义SSLContext");
-            }
-            
-            HttpClient client = clientBuilder.build();
+            // ✅ 使用共享的HttpClient实例
+            HttpClient client = getOrCreateHttpClient();
         
         // 构建 HTTP 请求
         HttpRequest request = HttpRequest.newBuilder()
