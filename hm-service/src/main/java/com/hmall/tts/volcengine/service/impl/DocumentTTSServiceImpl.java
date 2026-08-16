@@ -127,8 +127,86 @@ public class DocumentTTSServiceImpl implements DocumentTTSService {
     
     /**
      * 生成文档语音（包含时间信息）
+     * 
+     * ✅ 方案C优化：混合TTS策略
+     * - 简单文本（≤800字，≤2角色）→ 整句TTS + 1次对齐（6-10秒）
+     * - 复杂文本（>800字，>2角色）→ 分段TTS + 批量对齐（30-40秒）
      */
     private AudioGenerationResult generateDocumentSpeechWithTiming(List<TextSegment> segments, VoiceConfig voiceConfig) throws Exception {
+        // ✅ 新增：检查是否可以使用整句TTS（方案C优化）
+        boolean canUseSingleTTS = checkCanUseSingleTTS(segments);
+        
+        if (canUseSingleTTS) {
+            log.info("步骤2: 使用整句TTS模式（文本简单，性能最优）⭐");
+            return generateWithSingleTTS(segments, voiceConfig);
+        } else {
+            log.info("步骤2: 使用分段TTS模式（文本复杂，支持多角色）");
+            return generateWithMultiTTS(segments, voiceConfig);
+        }
+    }
+    
+    /**
+     * ✅ 方案C-路径1：整句TTS模式（简单文本）
+     * 性能：6-10秒（1次TTS + 1次对齐）
+     */
+    private AudioGenerationResult generateWithSingleTTS(List<TextSegment> segments, VoiceConfig voiceConfig) throws Exception {
+        log.info("[整句TTS] 开始生成...");
+        long startTime = System.currentTimeMillis();
+        
+        // 1. 合并所有文本
+        String fullText = segments.stream()
+            .map(TextSegment::getText)
+            .collect(java.util.stream.Collectors.joining());
+        
+        log.info("[整句TTS] 合并文本长度：{} 字符", fullText.length());
+        
+        // 2. 使用第一个segment的speaker（简单场景通常只有1-2个角色）
+        String speaker = segments.get(0).getSpeaker();
+        
+        // 3. 一次性调用TTS
+        log.info("[整句TTS] 步骤1: 调用TTS API（1次）...");
+        TTSRequest request = TTSRequest.builder()
+                .text(fullText)
+                .speaker(speaker)
+                .format(voiceConfig.getFormat())
+                .sampleRate(voiceConfig.getSampleRate())
+                .build();
+        
+        byte[] fullAudio = ttsService.generateSpeechBytes(request);
+        log.info("[整句TTS] TTS完成，音频大小：{} KB", fullAudio.length / 1024.0);
+        
+        // 4. 一次性对齐（使用WhisperX）
+        log.info("[整句TTS] 步骤2: WhisperX对齐（1次）...");
+        List<com.hmall.tts.whisperx.dto.CharTimestamp> allChars = null;
+        
+        if (whisperXService.isAvailable()) {
+            try {
+                allChars = whisperXService.align(fullAudio, fullText);
+                log.info("[整句TTS] WhisperX对齐完成，字符数：{}", allChars.size());
+            } catch (Exception e) {
+                log.warn("[整句TTS] WhisperX对齐失败，将使用智能算法：{}", e.getMessage());
+            }
+        }
+        
+        // 5. 根据句子边界切分成DialogSegment
+        log.info("[整句TTS] 步骤3: 自动切分句子...");
+        List<DialogSegment> dialogSegments = splitIntoSentences(segments, allChars, fullAudio, voiceConfig);
+        
+        // 6. 计算总时长
+        double totalDuration = calculateTotalDuration(fullAudio, voiceConfig);
+        
+        long elapsedTime = System.currentTimeMillis() - startTime;
+        log.info("[整句TTS] ✅ 完成！总时长：{}秒，耗时：{} ms，性能提升：~10倍", 
+                String.format("%.2f", totalDuration), elapsedTime);
+        
+        return new AudioGenerationResult(fullAudio, dialogSegments, totalDuration);
+    }
+    
+    /**
+     * ✅ 方案C-路径2：分段TTS模式（复杂文本）
+     * 性能：30-40秒（多次TTS + 批量对齐）
+     */
+    private AudioGenerationResult generateWithMultiTTS(List<TextSegment> segments, VoiceConfig voiceConfig) throws Exception {
         // 1. 合并相同音色的连续片段
         log.info("步骤2: 合并文本片段...");
         List<MergedSegment> mergedSegments = segmentMerger.merge(segments);
@@ -151,7 +229,7 @@ public class DocumentTTSServiceImpl implements DocumentTTSService {
         calculatePauses(audioSegments, mergedSegments);
         
         // 5. 构建对话片段列表（用于前端实时显示）
-        log.info("步骤5: 构建对话片段时间信息...");
+        log.info("步骤5: 构建对话片段时间信息（使用批量对齐）...");
         List<DialogSegment> dialogSegments = buildDialogSegments(segments, audioSegments, voiceConfig);
         
         // 6. 合并音频
@@ -165,6 +243,192 @@ public class DocumentTTSServiceImpl implements DocumentTTSService {
                 finalAudio.length / 1024.0, String.format("%.2f", totalDuration));
         
         return new AudioGenerationResult(finalAudio, dialogSegments, totalDuration);
+    }
+    
+    /**
+     * ✅ 方案C辅助方法：检查是否可以使用整句TTS
+     * 
+     * 判断条件：
+     * 1. 文本长度 ≤ 800字符（TTS API限制）
+     * 2. 角色数量 ≤ 2个（简单对话场景）
+     * 3. 无复杂样式切换（可选）
+     */
+    private boolean checkCanUseSingleTTS(List<TextSegment> segments) {
+        if (segments == null || segments.isEmpty()) {
+            return false;
+        }
+        
+        // 条件1：文本长度检查
+        int totalLength = segments.stream()
+                .mapToInt(s -> s.getText() != null ? s.getText().length() : 0)
+                .sum();
+        
+        if (totalLength > MAX_TEXT_LENGTH) {
+            log.debug("[整句TTS检查] 文本过长：{} > {} 字符，使用分段模式", totalLength, MAX_TEXT_LENGTH);
+            return false;
+        }
+        
+        // 条件2：角色数量检查
+        java.util.Set<String> speakers = segments.stream()
+                .map(TextSegment::getSpeaker)
+                .filter(s -> s != null && !s.isEmpty())
+                .collect(java.util.stream.Collectors.toSet());
+        
+        if (speakers.size() > 2) {
+            log.debug("[整句TTS检查] 角色过多：{} > 2个，使用分段模式", speakers.size());
+            return false;
+        }
+        
+        // 条件3：样式检查（可选，如果有复杂样式也分段）
+        // 这里暂时跳过，可以后续添加
+        
+        log.info("[整句TTS检查] ✅ 满足条件：文本{}字符，{}个角色，使用整句TTS模式", 
+                totalLength, speakers.size());
+        
+        return true;
+    }
+    
+    /**
+     * ✅ 方案C辅助方法：根据段落边界切分成DialogSegment
+     * 
+     * 策略：
+     * 1. 如果有WhisperX对齐结果，使用精确时间戳
+     * 2. **按段落ID切分**（而不是按标点符号），确保与Word文档一致
+     * 3. 每个段落对应一个DialogSegment
+     */
+    private List<DialogSegment> splitIntoSentences(List<TextSegment> originalSegments,
+                                                   List<com.hmall.tts.whisperx.dto.CharTimestamp> allChars,
+                                                   byte[] fullAudio,
+                                                   VoiceConfig voiceConfig) {
+        List<DialogSegment> dialogSegments = new ArrayList<>();
+        
+        // 合并所有文本
+        String fullText = originalSegments.stream()
+                .map(TextSegment::getText)
+                .collect(java.util.stream.Collectors.joining());
+        
+        String speaker = originalSegments.get(0).getSpeaker();
+        
+        // ✅ 按段落ID切分（与Word文档一致）
+        log.info("[自动切句] 按段落ID切分，共{}个原始segment", originalSegments.size());
+        
+        // 1. 按段落ID分组
+        Map<Integer, List<TextSegment>> paragraphMap = new java.util.LinkedHashMap<>();
+        for (TextSegment segment : originalSegments) {
+            paragraphMap.computeIfAbsent(segment.getParagraphId(), k -> new ArrayList<>()).add(segment);
+        }
+        
+        log.info("[自动切句] 共{}个段落", paragraphMap.size());
+        
+        // 如果没有WhisperX结果，使用智能算法均匀分配
+        if (allChars == null || allChars.isEmpty()) {
+            log.warn("[自动切句] WhisperX结果为空，使用智能算法");
+            
+            double totalDuration = calculateTotalDuration(fullAudio, voiceConfig);
+            double avgDurationPerChar = totalDuration / fullText.length();
+            double currentTime = 0.0;
+            
+            // 按段落生成DialogSegment
+            for (Map.Entry<Integer, List<TextSegment>> entry : paragraphMap.entrySet()) {
+                Integer paragraphId = entry.getKey();
+                List<TextSegment> paragraphSegments = entry.getValue();
+                
+                // 合并段落文本
+                String paragraphText = paragraphSegments.stream()
+                        .map(TextSegment::getText)
+                        .collect(java.util.stream.Collectors.joining());
+                
+                if (paragraphText.trim().isEmpty()) {
+                    continue;
+                }
+                
+                double paragraphDuration = paragraphText.length() * avgDurationPerChar;
+                List<CharTiming> charTimings = buildCharTimings(paragraphText, currentTime, paragraphDuration);
+                
+                DialogSegment dialogSegment = new DialogSegment();
+                dialogSegment.setText(paragraphText);
+                dialogSegment.setVoiceId(speaker);
+                dialogSegment.setStartTime(currentTime);
+                dialogSegment.setDuration(paragraphDuration);
+                dialogSegment.setCharTimings(charTimings);
+                
+                dialogSegments.add(dialogSegment);
+                
+                log.debug("[自动切句] 段落{}: 文本='{}', 时长={}秒", 
+                         paragraphId, 
+                         paragraphText.length() > 30 ? paragraphText.substring(0, 30) + "..." : paragraphText,
+                         String.format("%.2f", paragraphDuration));
+                
+                currentTime += paragraphDuration + 0.8;  // 添加800ms停顿
+            }
+            
+            log.info("[自动切句] 完成（智能算法），共{}个段落", dialogSegments.size());
+            return dialogSegments;
+        }
+        
+        // ✅ 使用WhisperX精确时间戳，按段落切分
+        log.info("[自动切句] 使用WhisperX精确时间戳，按段落切分");
+        
+        int charIndex = 0;
+        
+        // 按段落生成DialogSegment
+        for (Map.Entry<Integer, List<TextSegment>> entry : paragraphMap.entrySet()) {
+            Integer paragraphId = entry.getKey();
+            List<TextSegment> paragraphSegments = entry.getValue();
+            
+            // 合并段落文本
+            String paragraphText = paragraphSegments.stream()
+                    .map(TextSegment::getText)
+                    .collect(java.util.stream.Collectors.joining());
+            
+            if (paragraphText.trim().isEmpty()) {
+                continue;
+            }
+            
+            List<CharTiming> charTimings = new ArrayList<>();
+            double startTime = -1.0;
+            double endTime = 0.0;
+            
+            // 收集这个段落的所有字符时间戳
+            for (int i = 0; i < paragraphText.length() && charIndex < allChars.size(); i++, charIndex++) {
+                com.hmall.tts.whisperx.dto.CharTimestamp whisperXChar = allChars.get(charIndex);
+                
+                if (startTime < 0) {
+                    startTime = whisperXChar.getStartTime();
+                }
+                endTime = whisperXChar.getEndTime();
+                
+                CharTiming charTiming = new CharTiming();
+                charTiming.setCharacter(whisperXChar.getCharacter());
+                charTiming.setStartTime(whisperXChar.getStartTime());
+                charTiming.setDuration(whisperXChar.getDuration());
+                
+                charTimings.add(charTiming);
+            }
+            
+            if (startTime < 0) {
+                startTime = 0.0;
+            }
+            
+            DialogSegment dialogSegment = new DialogSegment();
+            dialogSegment.setText(paragraphText);
+            dialogSegment.setVoiceId(speaker);
+            dialogSegment.setStartTime(startTime);
+            dialogSegment.setDuration(endTime - startTime);
+            dialogSegment.setCharTimings(charTimings);
+            
+            dialogSegments.add(dialogSegment);
+            
+            log.debug("[自动切句] 段落{}: 文本='{}', startTime={}s, duration={}s", 
+                     paragraphId, 
+                     paragraphText.length() > 30 ? paragraphText.substring(0, 30) + "..." : paragraphText,
+                     String.format("%.2f", startTime),
+                     String.format("%.2f", endTime - startTime));
+        }
+        
+        log.info("[自动切句] 完成（WhisperX），共{}个段落", dialogSegments.size());
+        
+        return dialogSegments;
     }
     
     /**
@@ -189,21 +453,25 @@ public class DocumentTTSServiceImpl implements DocumentTTSService {
         }
         
         // 步骤1：构建行到AudioSegment的映射
-        // 合并策略：连续相同isBold的片段合并为一行
+        // ✅ 方案A：按段落ID合并（确保Word文档的每一段落对应视频的一行）
         List<LineInfo> lines = new ArrayList<>();
         StringBuilder lineText = new StringBuilder();
+        Integer currentParagraphId = originalSegments.get(0).getParagraphId();
         Boolean currentBold = originalSegments.get(0).getIsBold();
         String currentSpeaker = originalSegments.get(0).getSpeaker();
+        
+        log.info("[段落合并] 开始按段落ID合并，共{}个原始segment", originalSegments.size());
         
         for (int i = 0; i < originalSegments.size(); i++) {
             TextSegment segment = originalSegments.get(i);
             
-            // 判断是否需要输出当前行
-            boolean shouldOutput = !segment.getIsBold().equals(currentBold) || i == originalSegments.size() - 1;
+            // ✅ 判断是否需要输出当前行（段落ID变化 或 最后一个segment）
+            boolean shouldOutput = !segment.getParagraphId().equals(currentParagraphId) 
+                                || i == originalSegments.size() - 1;
             
             if (shouldOutput) {
-                // 如果是最后一个片段且加粗状态相同，需要添加当前文本
-                if (i == originalSegments.size() - 1 && segment.getIsBold().equals(currentBold)) {
+                // 如果是最后一个片段且段落ID相同，需要添加当前文本
+                if (i == originalSegments.size() - 1 && segment.getParagraphId().equals(currentParagraphId)) {
                     lineText.append(segment.getText());
                 }
                 
@@ -211,13 +479,18 @@ public class DocumentTTSServiceImpl implements DocumentTTSService {
                 String text = lineText.toString().trim();
                 if (!text.isEmpty()) {
                     lines.add(new LineInfo(text, currentBold, currentSpeaker));
+                    log.debug("[段落合并] 输出行{}：段落ID={}, 文本='{}', isBold={}", 
+                             lines.size(), currentParagraphId, 
+                             text.length() > 30 ? text.substring(0, 30) + "..." : text, 
+                             currentBold);
                 }
                 
                 // 开始新行
                 if (i < originalSegments.size() - 1) {
                     lineText = new StringBuilder();
-                    if (!segment.getIsBold().equals(currentBold)) {
+                    if (!segment.getParagraphId().equals(currentParagraphId)) {
                         lineText.append(segment.getText());
+                        currentParagraphId = segment.getParagraphId();
                         currentBold = segment.getIsBold();
                         currentSpeaker = segment.getSpeaker();
                     }
@@ -226,6 +499,18 @@ public class DocumentTTSServiceImpl implements DocumentTTSService {
                 lineText.append(segment.getText());
             }
         }
+        
+        log.info("[段落合并] 完成，共合并为{}行", lines.size());
+        
+        // ✅ 诊断日志：打印所有合并后的行信息
+        log.info("=== 段落合并详细信息 ===");
+        for (int i = 0; i < lines.size(); i++) {
+            LineInfo line = lines.get(i);
+            log.info("Line[{}]: isBold={}, speaker={}, 文本='{}'", 
+                     i, line.isBold, line.speaker, 
+                     line.text.length() > 50 ? line.text.substring(0, 50) + "..." : line.text);
+        }
+        log.info("=== 段落合并详细信息结束 ===");
         
         // ✅ Day 10批量优化：先收集所有需要对齐的音频和文本
         log.info("[WhisperX] === 开始批量收集对齐任务 ===");

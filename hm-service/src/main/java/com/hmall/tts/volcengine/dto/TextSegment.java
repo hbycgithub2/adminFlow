@@ -37,4 +37,10 @@ public class TextSegment {
      * 原始顺序（用于排序）
      */
     private Integer order;
+    
+    /**
+     * 段落ID（同一段落的Run有相同的ID）
+     * 用于视频生成时按段落分行显示
+     */
+    private Integer paragraphId;
 }

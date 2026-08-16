@@ -39,6 +39,7 @@ public class WordDocumentParser {
         
         try (XWPFDocument document = new XWPFDocument(inputStream)) {
             int order = 0;
+            int paragraphId = 0;  // ✅ 段落ID计数器
             
             // 遍历所有段落
             for (XWPFParagraph paragraph : document.getParagraphs()) {
@@ -53,6 +54,9 @@ public class WordDocumentParser {
                     log.debug("跳过标题段落: {}", paragraph.getText());
                     continue;
                 }
+                
+                // ✅ 每个段落递增ID
+                paragraphId++;
                 
                 // 遍历段落中的Run（格式化文本片段）
                 for (XWPFRun run : paragraph.getRuns()) {
@@ -80,16 +84,28 @@ public class WordDocumentParser {
                             .speaker(speaker)
                             .isBold(isBold)
                             .order(order++)
+                            .paragraphId(paragraphId)  // ✅ 设置段落ID
                             .build();
                     
                     segments.add(segment);
                     
-                    log.debug("解析文本片段: text={}, isBold={}, speaker={}", 
-                            text, isBold, speaker);
+                    log.debug("解析文本片段: text={}, isBold={}, speaker={}, paragraphId={}", 
+                            text, isBold, speaker, paragraphId);
                 }
             }
             
             log.info("Word文档解析完成，共解析{}个文本片段", segments.size());
+            
+            // ✅ 诊断日志：打印所有segment的详细信息
+            log.info("=== Word解析详细信息 ===");
+            log.info("段落总数：{}", paragraphId);
+            for (int i = 0; i < segments.size(); i++) {
+                TextSegment seg = segments.get(i);
+                log.info("Segment[{}]: 段落ID={}, isBold={}, 文本='{}'", 
+                         i, seg.getParagraphId(), seg.getIsBold(), seg.getText());
+            }
+            log.info("=== Word解析详细信息结束 ===");
+            
             return segments;
             
         } catch (Exception e) {
