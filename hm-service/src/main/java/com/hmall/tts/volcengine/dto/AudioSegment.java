@@ -41,6 +41,12 @@ public class AudioSegment {
      */
     private Integer pauseDuration;
     
+    /**
+     * 精确时长（秒）- 使用FFprobe从实际音频文件中获取
+     * 这个值比基于数据大小估算的时长更准确（误差±0.001秒）
+     */
+    private Double accurateDuration;
+    
     public AudioSegment(byte[] audioData, MergedSegment mergedSegment) {
         this.audioData = audioData;
         this.mergedSegment = mergedSegment;

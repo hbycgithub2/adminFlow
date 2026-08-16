@@ -74,6 +74,17 @@ volcengine:
     default-format: mp3                            # 默认音频格式
     default-sample-rate: 24000                     # 默认采样率
     output-dir: tts                                # 音频输出目录
+
+# Whisper 配置（完全免费的语音识别）
+whisper:
+  python:
+    command: py                                    # Python 命令（py 或 python）
+  script:
+    path: D:/code/adminFlow/scripts/whisper_transcribe.py  # Whisper 识别脚本路径
+  temp:
+    dir: D:/code/adminFlow/temp/whisper           # 临时文件目录
+  timeout:
+    seconds: 60                                    # 超时时间（秒）
 hm:
   jwt:
     location: classpath:hmall.jks
@@ -98,3 +109,13 @@ hm:
       - /**/*.js                  # 所有 JS 文件
       - /**/*.css                 # 所有 CSS 文件
 # keytool -genkeypair -alias hmall -keyalg RSA -keypass hmall123 -keystore hmall.jks -storepass hmall123
+# WhisperX 閰嶇疆锛?8-99% 瀛楃绾у瓧骞曞悓姝ワ級
+whisperx:
+  python:
+    command: py -3.13  # 浣跨敤 py launcher锛岄伩鍏嶇┖鏍奸棶棰?
+  script:
+    path: D:/code/adminFlow/scripts/whisperx_align.py  # WhisperX 瀵归綈鑴氭湰璺緞
+  temp:
+    dir: D:/code/adminFlow/temp/whisperx           # 涓存椂鏂囦欢鐩綍
+  timeout:
+    seconds: 120                                    # 瓒呮椂鏃堕棿锛堢锛屽洜涓烘ā鍨嬪姞杞介渶瑕佹洿闀挎椂闂达級

@@ -1,0 +1,21 @@
+[Script Info]
+Title: 对话字幕视频
+ScriptType: v4.00+
+WrapStyle: 0
+PlayResX: 1920
+PlayResY: 1080
+ScaledBorderAndShadow: yes
+
+[V4+ Styles]
+Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding
+Style: Default,Arial,80,&H00FFFFFF&,&H000088EF,&H00000000&,&H80000000,0,0,0,0,100,100,0,0,1,2,2,2,10,10,10,1
+
+[Events]
+Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
+Dialogue: 0,0:00:00.00,0:00:04.86,Default,,0,0,0,,{\fad(300,300)}你好，我是云舟， 很高兴认识你小薇
+Dialogue: 0,0:00:04.86,0:00:07.32,Default,,0,0,0,,{\fad(300,300)}你好，云舟我也很高兴认识你
+Dialogue: 0,0:00:07.32,0:00:11.98,Default,,0,0,0,,{\fad(300,300)}你来自哪里？
+Dialogue: 0,0:00:11.98,0:00:11.98,Default,,0,0,0,,{\fad(300,300)}我来在吉林，你呢
+Dialogue: 0,0:00:11.98,0:00:11.98,Default,,0,0,0,,{\fad(300,300)}我来在大连
+Dialogue: 0,0:00:11.98,0:00:11.98,Default,,0,0,0,,{\fad(300,300)}你喜欢运动是什么？
+Dialogue: 0,0:00:11.98,0:00:11.98,Default,,0,0,0,,{\fad(300,300)}我喜欢打羽毛球、打棒球，我还喜欢游泳，滑冰

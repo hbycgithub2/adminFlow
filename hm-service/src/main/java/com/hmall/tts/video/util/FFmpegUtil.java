@@ -24,6 +24,12 @@ public class FFmpegUtil {
     private static final String FFMPEG_PATH = "D:\\ai\\codex\\ffmpeg-9.0.1-essentials_build\\bin\\ffmpeg.exe";
     
     /**
+     * FFprobe可执行文件路径
+     * 使用绝对路径避免PATH环境变量问题
+     */
+    private static final String FFPROBE_PATH = "D:\\ai\\codex\\ffmpeg-9.0.1-essentials_build\\bin\\ffprobe.exe";
+    
+    /**
      * 生成视频
      * 
      * @param audioPath 音频文件路径
@@ -244,7 +250,7 @@ public class FFmpegUtil {
      */
     public double getAudioDuration(String audioPath) throws Exception {
         List<String> command = new ArrayList<>();
-        command.add("ffprobe");
+        command.add(FFPROBE_PATH); // 使用绝对路径
         command.add("-v");
         command.add("error");
         command.add("-show_entries");
@@ -261,6 +267,10 @@ public class FFmpegUtil {
         
         process.waitFor();
         
-        return Double.parseDouble(durationStr);
+        if (durationStr == null || durationStr.trim().isEmpty()) {
+            throw new Exception("FFprobe返回的时长为空");
+        }
+        
+        return Double.parseDouble(durationStr.trim());
     }
 }
