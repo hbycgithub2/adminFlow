@@ -71,11 +71,18 @@ public class DocumentTTSServiceImpl implements DocumentTTSService {
     
     @Override
     public DocumentTTSResult generateDocumentSpeech(MultipartFile file, VoiceConfig voiceConfig) {
+        // 默认不跳过对齐（保持向后兼容）
+        return generateDocumentSpeech(file, voiceConfig, false);
+    }
+    
+    @Override
+    public DocumentTTSResult generateDocumentSpeech(MultipartFile file, VoiceConfig voiceConfig, boolean skipAlignment) {
         long startTime = System.currentTimeMillis();
         String taskId = UUID.randomUUID().toString();
         
         try {
-            log.info("开始生成文档TTS，任务ID: {}, 文件名: {}", taskId, file.getOriginalFilename());
+            log.info("开始生成文档TTS，任务ID: {}, 文件名: {}, 跳过对齐: {}", 
+                    taskId, file.getOriginalFilename(), skipAlignment);
             
             // 1. 验证文件
             validateFile(file);
