@@ -20,6 +20,10 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import java.util.UUID;
+import org.springframework.web.client.RestTemplate;
+import org.springframework.http.*;
+import java.util.HashMap;
+import java.util.Map;
 
 /**
  * WhisperX强制对齐服务实现类
@@ -43,13 +47,148 @@ public class WhisperXServiceImpl implements WhisperXService {
     @Value("${whisperx.timeout.seconds:120}")
     private int timeoutSeconds;
     
+    @Value("${whisperx.server.url:http://localhost:5000}")
+    private String whisperxServerUrl;
+    
+    @Value("${whisperx.use.server:true}")
+    private boolean useServer;
+    
     /**
      * 实际使用的Python命令（自动检测或配置指定）
      */
     private String actualPythonCommand = null;
     
+    /**
+     * HTTP客户端（用于调用WhisperX服务）
+     * ✅ Day 10修复：配置超时时间，避免批量对齐超时
+     */
+    private RestTemplate restTemplate;
+    
+    /**
+     * 初始化RestTemplate（带超时配置）
+     */
+    @javax.annotation.PostConstruct
+    private void initRestTemplate() {
+        // 配置HTTP超时（批量对齐可能需要较长时间）
+        org.springframework.http.client.SimpleClientHttpRequestFactory factory = 
+            new org.springframework.http.client.SimpleClientHttpRequestFactory();
+        
+        // 连接超时：5秒
+        int connectTimeout = 5000;
+        factory.setConnectTimeout(connectTimeout);
+        
+        // 读取超时：根据配置的timeoutSeconds（默认120秒）
+        int readTimeout = Math.max(timeoutSeconds * 1000, 60000);  // 至少60秒
+        factory.setReadTimeout(readTimeout);
+        
+        restTemplate = new RestTemplate(factory);
+        
+        log.info("[WhisperX] RestTemplate初始化完成，连接超时：{}秒，读取超时：{}秒", 
+                connectTimeout / 1000, readTimeout / 1000);
+    }
+    
     @Override
     public List<CharTimestamp> align(byte[] audioData, String originalText) throws Exception {
+        // ✅ 优先使用HTTP服务（常驻进程，速度快）
+        if (useServer && isServerAvailable()) {
+            return alignViaServer(audioData, originalText);
+        }
+        
+        // ✅ 回退到Python脚本模式（兼容性）
+        log.warn("[WhisperX] 服务不可用，回退到Python脚本模式");
+        return alignViaScript(audioData, originalText);
+    }
+    
+    /**
+     * 通过HTTP服务进行对齐（常驻进程，速度快）
+     */
+    private List<CharTimestamp> alignViaServer(byte[] audioData, String originalText) throws Exception {
+        long startTime = System.currentTimeMillis();
+        Path audioPath = null;
+        
+        try {
+            log.info("[WhisperX] 使用HTTP服务进行对齐，音频大小：{} KB，文本长度：{}", 
+                    audioData.length / 1024.0, originalText.length());
+            
+            // 1. 保存音频到临时文件
+            audioPath = saveAudioToTemp(audioData);
+            
+            // 2. 构建请求
+            Map<String, Object> requestBody = new HashMap<>();
+            requestBody.put("audio", audioPath.toString());
+            requestBody.put("text", originalText);
+            
+            HttpHeaders headers = new HttpHeaders();
+            headers.setContentType(MediaType.APPLICATION_JSON);
+            
+            HttpEntity<Map<String, Object>> request = new HttpEntity<>(requestBody, headers);
+            
+            // 3. 调用HTTP接口
+            String url = whisperxServerUrl + "/align";
+            ResponseEntity<String> response = restTemplate.postForEntity(url, request, String.class);
+            
+            if (!response.getStatusCode().is2xxSuccessful()) {
+                throw new WhisperXException("HTTP服务返回错误：" + response.getStatusCode());
+            }
+            
+            // 4. 解析响应
+            JSONObject json = JSON.parseObject(response.getBody());
+            
+            Boolean success = json.getBoolean("success");
+            if (success == null || !success) {
+                String error = json.getString("error");
+                throw new WhisperXException("WhisperX对齐失败：" + error);
+            }
+            
+            // 5. 提取字符级时间戳
+            JSONArray chars = json.getJSONArray("characters");
+            List<CharTimestamp> timestamps = new ArrayList<>();
+            
+            if (chars != null) {
+                for (int i = 0; i < chars.size(); i++) {
+                    JSONObject charObj = chars.getJSONObject(i);
+                    timestamps.add(new CharTimestamp(
+                        charObj.getString("char"),
+                        charObj.getDouble("start"),
+                        charObj.getDouble("end")
+                    ));
+                }
+            }
+            
+            Double duration = json.getDouble("audio_duration");
+            Double audioOffset = json.getDouble("audio_offset");
+            
+            if (audioOffset != null && audioOffset > 0.01) {
+                log.info("[WhisperX] 音频偏移量：{}秒（已自动归零）", String.format("%.3f", audioOffset));
+            }
+            
+            long elapsedTime = System.currentTimeMillis() - startTime;
+            log.info("[WhisperX] ✅ HTTP服务对齐完成，字符数：{}，音频时长：{}秒，耗时：{} ms", 
+                    timestamps.size(), String.format("%.2f", duration), elapsedTime);
+            
+            return timestamps;
+            
+        } catch (WhisperXException e) {
+            throw e;
+        } catch (Exception e) {
+            log.error("[WhisperX] HTTP服务对齐异常", e);
+            throw new WhisperXException("WhisperX HTTP服务对齐异常：" + e.getMessage(), e);
+        } finally {
+            if (audioPath != null) {
+                try {
+                    Files.deleteIfExists(audioPath);
+                    log.debug("[WhisperX] ✅ 临时文件已清理：{}", audioPath);
+                } catch (Exception e) {
+                    log.warn("[WhisperX] ⚠️ 清理临时文件失败：{}", audioPath, e);
+                }
+            }
+        }
+    }
+    
+    /**
+     * 通过Python脚本进行对齐（原有方式，兼容性）
+     */
+    private List<CharTimestamp> alignViaScript(byte[] audioData, String originalText) throws Exception {
         long startTime = System.currentTimeMillis();
         Path audioPath = null;  // ✅ 提前声明，确保finally能访问
         
@@ -261,6 +400,13 @@ public class WhisperXServiceImpl implements WhisperXService {
             throw new WhisperXException("音频列表和原文列表长度不一致");
         }
         
+        // ✅ 优先使用HTTP批量接口（性能最优）
+        if (useServer && isServerAvailable()) {
+            return alignBatchViaServer(audioDataList, originalTextList);
+        }
+        
+        // ✅ 回退到逐个处理（兼容性）
+        log.warn("[WhisperX] 服务不可用，回退到逐个处理模式");
         List<List<CharTimestamp>> results = new ArrayList<>();
         
         for (int i = 0; i < audioDataList.size(); i++) {
@@ -274,6 +420,162 @@ public class WhisperXServiceImpl implements WhisperXService {
         }
         
         return results;
+    }
+    
+    /**
+     * 通过HTTP服务进行批量对齐（性能最优）
+     * ✅ Day 10修复：确保临时文件在任何情况下都被清理
+     */
+    private List<List<CharTimestamp>> alignBatchViaServer(List<byte[]> audioDataList, List<String> originalTextList) throws Exception {
+        long startTime = System.currentTimeMillis();
+        List<Path> audioPaths = new ArrayList<>();
+        
+        try {
+            log.info("[WhisperX] 使用HTTP批量接口，音频数量：{}", audioDataList.size());
+            
+            // 1. 保存所有音频到临时文件
+            for (int i = 0; i < audioDataList.size(); i++) {
+                try {
+                    Path audioPath = saveAudioToTemp(audioDataList.get(i));
+                    audioPaths.add(audioPath);
+                } catch (Exception e) {
+                    log.error("[WhisperX] 第{}个音频保存失败", i + 1, e);
+                    // ✅ 继续处理其他音频，最后统一清理
+                }
+            }
+            
+            if (audioPaths.isEmpty()) {
+                throw new WhisperXException("所有音频保存失败，无法进行批量对齐");
+            }
+            
+            // 2. 构建批量请求
+            List<Map<String, String>> requests = new ArrayList<>();
+            for (int i = 0; i < audioPaths.size(); i++) {
+                Map<String, String> req = new HashMap<>();
+                req.put("audio", audioPaths.get(i).toString());
+                req.put("text", originalTextList.get(i));
+                requests.add(req);
+            }
+            
+            Map<String, Object> requestBody = new HashMap<>();
+            requestBody.put("requests", requests);
+            
+            HttpHeaders headers = new HttpHeaders();
+            headers.setContentType(MediaType.APPLICATION_JSON);
+            
+            HttpEntity<Map<String, Object>> request = new HttpEntity<>(requestBody, headers);
+            
+            // 3. 调用HTTP批量接口（增加超时时间）
+            String url = whisperxServerUrl + "/align_batch";
+            
+            // ✅ 使用超时设置（批量对齐可能需要更长时间）
+            int batchTimeoutMs = Math.max(timeoutSeconds * 1000, audioDataList.size() * 5000);  // 至少5秒/个
+            log.debug("[WhisperX] HTTP超时设置：{} ms（{}秒/个）", batchTimeoutMs, batchTimeoutMs / audioDataList.size() / 1000);
+            
+            ResponseEntity<String> response = restTemplate.postForEntity(url, request, String.class);
+            
+            if (!response.getStatusCode().is2xxSuccessful()) {
+                throw new WhisperXException("HTTP服务返回错误：" + response.getStatusCode());
+            }
+            
+            // 4. 解析响应
+            JSONObject json = JSON.parseObject(response.getBody());
+            
+            Boolean success = json.getBoolean("success");
+            if (success == null || !success) {
+                String error = json.getString("error");
+                throw new WhisperXException("WhisperX批量对齐失败：" + error);
+            }
+            
+            // 5. 提取结果
+            JSONArray resultsArray = json.getJSONArray("results");
+            List<List<CharTimestamp>> allResults = new ArrayList<>();
+            
+            int successCount = 0;
+            int failCount = 0;
+            
+            for (int i = 0; i < resultsArray.size(); i++) {
+                JSONObject resultObj = resultsArray.getJSONObject(i);
+                
+                Boolean itemSuccess = resultObj.getBoolean("success");
+                if (itemSuccess == null || !itemSuccess) {
+                    log.warn("[WhisperX] 第{}个音频对齐失败：{}", i + 1, resultObj.getString("error"));
+                    allResults.add(new ArrayList<>());  // ✅ 添加空列表，保持索引对齐
+                    failCount++;
+                    continue;
+                }
+                
+                JSONArray chars = resultObj.getJSONArray("characters");
+                List<CharTimestamp> timestamps = new ArrayList<>();
+                
+                if (chars != null) {
+                    for (int j = 0; j < chars.size(); j++) {
+                        JSONObject charObj = chars.getJSONObject(j);
+                        timestamps.add(new CharTimestamp(
+                            charObj.getString("char"),
+                            charObj.getDouble("start"),
+                            charObj.getDouble("end")
+                        ));
+                    }
+                }
+                
+                allResults.add(timestamps);
+                successCount++;
+            }
+            
+            long elapsedTime = System.currentTimeMillis() - startTime;
+            log.info("[WhisperX] ✅ HTTP批量对齐完成，音频数量：{}，成功：{}，失败：{}，耗时：{} ms，平均：{} ms/个", 
+                    audioDataList.size(), successCount, failCount, elapsedTime, 
+                    audioDataList.size() > 0 ? elapsedTime / audioDataList.size() : 0);
+            
+            return allResults;
+            
+        } catch (WhisperXException e) {
+            throw e;
+        } catch (Exception e) {
+            log.error("[WhisperX] HTTP批量对齐异常", e);
+            throw new WhisperXException("WhisperX HTTP批量对齐异常：" + e.getMessage(), e);
+        } finally {
+            // ✅ 确保临时文件在任何情况下都被清理（成功、失败、异常）
+            if (!audioPaths.isEmpty()) {
+                int cleanedCount = 0;
+                int failedCount = 0;
+                
+                for (Path audioPath : audioPaths) {
+                    try {
+                        if (Files.deleteIfExists(audioPath)) {
+                            cleanedCount++;
+                        }
+                    } catch (Exception e) {
+                        log.warn("[WhisperX] ⚠️ 清理临时文件失败：{}", audioPath, e);
+                        failedCount++;
+                    }
+                }
+                
+                log.debug("[WhisperX] ✅ 临时文件清理完成，成功：{}，失败：{}", cleanedCount, failedCount);
+            }
+        }
+    }
+    
+    /**
+     * 检查HTTP服务是否可用
+     */
+    private boolean isServerAvailable() {
+        try {
+            String url = whisperxServerUrl + "/health";
+            ResponseEntity<String> response = restTemplate.getForEntity(url, String.class);
+            
+            if (response.getStatusCode().is2xxSuccessful()) {
+                JSONObject json = JSON.parseObject(response.getBody());
+                Boolean status = json.getBoolean("model_loaded");
+                return status != null && status;
+            }
+            
+            return false;
+        } catch (Exception e) {
+            log.debug("[WhisperX] HTTP服务不可用：{}", e.getMessage());
+            return false;
+        }
     }
     
     @Override

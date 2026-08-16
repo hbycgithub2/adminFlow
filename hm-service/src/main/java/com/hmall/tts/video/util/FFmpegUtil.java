@@ -20,6 +20,13 @@ public class FFmpegUtil {
     /**
      * FFmpeg可执行文件路径
      * 使用绝对路径避免PATH环境变量问题
+     * 
+     * ⚠️ 版本选择建议：
+     * - FFmpeg 9.0+ 需要 NVIDIA 驱动 ≥ 610.00（支持NVENC API 13.1）
+     * - FFmpeg 6.1 LTS 支持 NVIDIA 驱动 ≥ 531.00（支持NVENC API 12.x）
+     * - 如果驱动版本低于610，建议使用 FFmpeg 6.1.1
+     * 
+     * 📝 当前配置：使用FFmpeg 9.0.1，GPU加速已禁用（避免驱动兼容性问题）
      */
     private static final String FFMPEG_PATH = "D:\\ai\\codex\\ffmpeg-9.0.1-essentials_build\\bin\\ffmpeg.exe";
     
@@ -28,6 +35,17 @@ public class FFmpegUtil {
      * 使用绝对路径避免PATH环境变量问题
      */
     private static final String FFPROBE_PATH = "D:\\ai\\codex\\ffmpeg-9.0.1-essentials_build\\bin\\ffprobe.exe";
+    
+    /**
+     * 是否启用GPU硬件加速（NVIDIA NVENC）
+     * ⚠️ 临时禁用：驱动版本可能不支持，先保证功能可用
+     */
+    private static final boolean ENABLE_GPU_ACCELERATION = false;
+    
+    /**
+     * GPU编码器（h264_nvenc）
+     */
+    private static final String GPU_ENCODER = "h264_nvenc";
     
     /**
      * 生成视频
@@ -76,12 +94,20 @@ public class FFmpegUtil {
     }
     
     /**
-     * 构建FFmpeg命令
+     * 构建FFmpeg命令（支持GPU硬件加速）
      */
     private List<String> buildFFmpegCommand(String audioPath, String assPath, String outputPath, VideoConfig config) {
         List<String> command = new ArrayList<>();
         
         command.add(FFMPEG_PATH);
+        
+        // 🚀 GPU加速：启用CUDA硬件加速
+        if (ENABLE_GPU_ACCELERATION) {
+            command.add("-hwaccel");
+            command.add("cuda");
+            command.add("-hwaccel_output_format");
+            command.add("cuda");
+        }
         
         // 输入音频
         command.add("-i");
@@ -110,9 +136,26 @@ public class FFmpegUtil {
         command.add("-vf");
         command.add(String.format("ass=%s", assPath.replace("\\", "/")));
         
-        // 视频编码参数
+        // 🚀 GPU加速：使用NVIDIA NVENC编码器
         command.add("-c:v");
-        command.add(config.getCodec());
+        if (ENABLE_GPU_ACCELERATION) {
+            command.add(GPU_ENCODER);  // h264_nvenc（GPU编码，速度提升15-30倍）
+            
+            // NVENC专用参数
+            command.add("-preset");
+            command.add("p1");  // p1=fastest, p7=slowest（相当于CPU的ultrafast）
+            
+            command.add("-tune");
+            command.add("hq");  // hq=高质量, ll=低延迟, ull=超低延迟
+            
+            command.add("-rc");
+            command.add("vbr");  // vbr=可变码率, cbr=固定码率
+            
+            log.info("✅ 使用GPU硬件加速（NVIDIA NVENC h264_nvenc）");
+        } else {
+            command.add(config.getCodec());  // libx264（CPU编码，降级方案）
+            log.info("⚠️ 使用CPU编码（libx264）");
+        }
         
         command.add("-b:v");
         command.add(config.getBitrate() + "k");
@@ -153,6 +196,7 @@ public class FFmpegUtil {
     
     /**
      * 从音频和ASS字幕生成视频（简化版，用于字幕编辑后重新生成）
+     * 🚀 支持GPU硬件加速
      * 
      * @param audioPath 音频文件路径
      * @param assPath ASS字幕文件路径
@@ -171,6 +215,14 @@ public class FFmpegUtil {
             
             command.add(FFMPEG_PATH);
             
+            // 🚀 GPU加速：启用CUDA硬件加速
+            if (ENABLE_GPU_ACCELERATION) {
+                command.add("-hwaccel");
+                command.add("cuda");
+                command.add("-hwaccel_output_format");
+                command.add("cuda");
+            }
+            
             // 输入音频
             command.add("-i");
             command.add(audioPath);
@@ -185,9 +237,26 @@ public class FFmpegUtil {
             command.add("-vf");
             command.add(String.format("ass=%s", assPath.replace("\\", "/")));
             
-            // 视频编码
+            // 🚀 GPU加速：使用NVIDIA NVENC编码器
             command.add("-c:v");
-            command.add("libx264");
+            if (ENABLE_GPU_ACCELERATION) {
+                command.add(GPU_ENCODER);  // h264_nvenc（GPU编码）
+                
+                command.add("-preset");
+                command.add("p1");  // fastest
+                
+                command.add("-tune");
+                command.add("hq");  // 高质量
+                
+                command.add("-rc");
+                command.add("vbr");  // 可变码率
+                
+                log.info("✅ 使用GPU硬件加速（NVIDIA NVENC）");
+            } else {
+                command.add("libx264");  // CPU编码（降级方案）
+                log.info("⚠️ 使用CPU编码（libx264）");
+            }
+            
             command.add("-b:v");
             command.add("2000k");
             command.add("-r");

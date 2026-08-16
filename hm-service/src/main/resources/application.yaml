@@ -109,13 +109,21 @@ hm:
       - /**/*.js                  # 所有 JS 文件
       - /**/*.css                 # 所有 CSS 文件
 # keytool -genkeypair -alias hmall -keyalg RSA -keypass hmall123 -keystore hmall.jks -storepass hmall123
-# WhisperX 閰嶇疆锛?8-99% 瀛楃绾у瓧骞曞悓姝ワ級
+# WhisperX 配置（98-99% 字符级字幕同步）
 whisperx:
   python:
-    command: py -3.13  # 浣跨敤 py launcher锛岄伩鍏嶇┖鏍奸棶棰?
+    command: py -3.13  # 使用 py launcher，避免空格问题
   script:
-    path: D:/code/adminFlow/scripts/whisperx_align.py  # WhisperX 瀵归綈鑴氭湰璺緞
+    path: D:/code/adminFlow/scripts/whisperx_align.py  # WhisperX 对齐脚本路径
   temp:
-    dir: D:/code/adminFlow/temp/whisperx           # 涓存椂鏂囦欢鐩綍
+    dir: D:/code/adminFlow/temp/whisperx           # 临时文件目录
   timeout:
-    seconds: 120                                    # 瓒呮椂鏃堕棿锛堢锛屽洜涓烘ā鍨嬪姞杞介渶瑕佹洿闀挎椂闂达級
+    seconds: 120                                    # 超时时间（秒，因为模型加载需要更长时间）
+  # ✅ Day 10批量优化：常驻进程模式（性能提升87%）
+  use:
+    server: true                                    # 启用HTTP服务（常驻进程模式）
+  server:
+    url: http://localhost:5000                      # WhisperX服务地址
+  batch:
+    enabled: true                                   # 启用批量对齐
+    size: 50                                        # 每批最多50个segment

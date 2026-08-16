@@ -70,9 +70,15 @@ application-local.yaml
 application-dev.yml
 application-dev.yaml
 
-# Edge TTS output (if you want to exclude generated audio files)
-# *.mp3
-# *.wav
+# Edge TTS output and generated files
+tts/temp/
+tts/documents/
+tts/videos/
+temp/whisperx/
+*.mp3
+*.mp4
+*.wav
+*.ass
 
 # Python (for edge-tts)
 __pycache__/

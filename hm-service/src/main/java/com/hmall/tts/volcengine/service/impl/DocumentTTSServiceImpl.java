@@ -15,7 +15,9 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutorService;
@@ -225,8 +227,84 @@ public class DocumentTTSServiceImpl implements DocumentTTSService {
             }
         }
         
-        // 步骤2：根据AudioSegment的实际音频时长构建DialogSegment
+        // ✅ Day 10批量优化：先收集所有需要对齐的音频和文本
+        log.info("[WhisperX] === 开始批量收集对齐任务 ===");
+        
+        // ✅ 修复：使用Map记录segment与批量结果的映射关系
+        List<byte[]> allSegmentAudios = new ArrayList<>();
+        List<String> allSegmentTexts = new ArrayList<>();
+        Map<String, Integer> segmentToBatchIndexMap = new HashMap<>();  // key: lineIndex-segmentIndex, value: batchIndex
+        
         int audioIndex = 0;
+        int batchIndex = 0;
+        
+        for (int lineIndex = 0; lineIndex < lines.size(); lineIndex++) {
+            LineInfo line = lines.get(lineIndex);
+            
+            // 找到对应的AudioSegment（相同音色）
+            List<AudioSegment> lineAudioSegments = new ArrayList<>();
+            int segmentIndexInLine = 0;  // 记录当前行的segment索引
+            
+            while (audioIndex < audioSegments.size()) {
+                AudioSegment audioSegment = audioSegments.get(audioIndex);
+                lineAudioSegments.add(audioSegment);
+                
+                // 收集有效音频segment
+                if (audioSegment.getAudioData() != null && audioSegment.getAudioData().length > 0) {
+                    allSegmentAudios.add(audioSegment.getAudioData());
+                    allSegmentTexts.add(audioSegment.getMergedSegment().getText());
+                    
+                    // ✅ 记录映射关系（lineIndex-segmentIndexInLine → batchIndex）
+                    // ✅ 修复：使用segmentIndexInLine（与第二遍遍历的segIdx保持一致）
+                    String key = lineIndex + "-" + segmentIndexInLine;
+                    segmentToBatchIndexMap.put(key, batchIndex);
+                    batchIndex++;
+                    
+                    log.debug("[WhisperX] 收集：行{}-segment{} → batch{}", lineIndex, segmentIndexInLine, batchIndex - 1);
+                }
+                
+                segmentIndexInLine++;  // ✅ 无论有无音频，都递增（与lineAudioSegments索引一致）
+                audioIndex++;
+                
+                // 检查下一个AudioSegment是否属于同一行（同一音色）
+                if (audioIndex < audioSegments.size()) {
+                    AudioSegment nextSegment = audioSegments.get(audioIndex);
+                    String nextSpeaker = nextSegment.getMergedSegment().getSpeaker();
+                    if (!nextSpeaker.equals(line.speaker)) {
+                        break;
+                    }
+                } else {
+                    break;
+                }
+            }
+        }
+        
+        log.info("[WhisperX] 收集完成，共{}个segment需要对齐", allSegmentAudios.size());
+        
+        // ✅ 批量调用WhisperX（核心优化）
+        List<List<com.hmall.tts.whisperx.dto.CharTimestamp>> batchResults = null;
+        if (!allSegmentAudios.isEmpty()) {
+            try {
+                log.info("[WhisperX] === 开始批量对齐 ===");
+                long batchStartTime = System.currentTimeMillis();
+                
+                batchResults = whisperXService.alignBatch(allSegmentAudios, allSegmentTexts);
+                
+                long batchElapsedTime = System.currentTimeMillis() - batchStartTime;
+                log.info("[WhisperX] ✅ 批量对齐完成，总耗时：{} ms，平均每个：{} ms", 
+                         batchElapsedTime, batchElapsedTime / allSegmentAudios.size());
+                
+            } catch (Exception e) {
+                log.warn("[WhisperX] 批量对齐失败，将回退到智能算法：{}", e.getMessage());
+                batchResults = null;
+            }
+        }
+        
+        // ✅ 重新遍历lines，应用批量对齐结果
+        log.info("[WhisperX] === 开始应用对齐结果 ===");
+        
+        audioIndex = 0;
+        
         for (int lineIndex = 0; lineIndex < lines.size(); lineIndex++) {
             LineInfo line = lines.get(lineIndex);
             
@@ -241,17 +319,13 @@ public class DocumentTTSServiceImpl implements DocumentTTSService {
                 // 使用精确时长（FFprobe或估算）
                 double segmentDuration;
                 if (audioSegment.getAccurateDuration() != null) {
-                    // 使用FFprobe获取的精确时长（99%准确）
                     segmentDuration = audioSegment.getAccurateDuration();
-                    log.debug("使用FFprobe精确时长: {}秒", String.format("%.3f", segmentDuration));
                 } else {
-                    // 回退到估算方法（如果FFprobe失败）
                     segmentDuration = calculateAudioDuration(
                         audioSegment.getAudioData(), 
                         voiceConfig.getFormat(), 
                         voiceConfig.getSampleRate()
                     );
-                    log.warn("FFprobe时长缺失，使用估算值: {}秒", String.format("%.3f", segmentDuration));
                 }
                 
                 lineDuration += segmentDuration;
@@ -270,7 +344,6 @@ public class DocumentTTSServiceImpl implements DocumentTTSService {
                     AudioSegment nextSegment = audioSegments.get(audioIndex);
                     String nextSpeaker = nextSegment.getMergedSegment().getSpeaker();
                     if (!nextSpeaker.equals(line.speaker)) {
-                        // 下一个是不同音色，当前行结束
                         break;
                     }
                 } else {
@@ -278,98 +351,92 @@ public class DocumentTTSServiceImpl implements DocumentTTSService {
                 }
             }
             
-            // ✅ Day 5修复：每个AudioSegment单独处理WhisperX
-            // ✅ Day 6关键修复：使用WhisperX实际时长，而不是FFprobe时长
+            // ✅ 应用批量对齐结果
             List<CharTiming> charTimings = new ArrayList<>();
-            double actualLineDuration = 0.0;  // ← Day 6新增：记录WhisperX实际时长
+            double actualLineDuration = 0.0;
             
-            // 如果当前行没有音频片段，或者所有音频片段都是失败的（空音频），直接使用智能算法
-            boolean hasValidAudio = false;
-            for (AudioSegment seg : lineAudioSegments) {
-                if (seg.getAudioData() != null && seg.getAudioData().length > 0) {
-                    hasValidAudio = true;
-                    break;
-                }
-            }
+            // 检查是否有有效音频
+            boolean hasValidAudio = lineAudioSegments.stream()
+                .anyMatch(seg -> seg.getAudioData() != null && seg.getAudioData().length > 0);
             
-            if (lineAudioSegments.isEmpty() || !hasValidAudio) {
-                log.warn("[WhisperX] 当前行「{}」没有有效音频片段，跳过WhisperX对齐，使用智能算法", 
-                         line.text.length() > 20 ? line.text.substring(0, 20) + "..." : line.text);
-                actualLineDuration = lineDuration;  // 回退到FFprobe时长
+            if (!hasValidAudio) {
+                log.warn("[WhisperX] 行 {} 无有效音频，使用智能算法", lineIndex);
+                actualLineDuration = lineDuration;
                 charTimings = buildCharTimings(line.text, currentTime, actualLineDuration);
             } else {
-                // ✅ 核心修复：逐个处理AudioSegment（避免停顿插入问题）
-                double segmentStartTime = currentTime;  // 当前segment的开始时间
+                // ✅ 从批量结果中提取当前行的对齐结果
+                double segmentStartTime = currentTime;
                 
-                log.info("[WhisperX] === 开始处理行 {} ===", lineIndex);
+                log.info("[WhisperX] === 处理行 {} ===", lineIndex);
                 log.info("[WhisperX] 行文本：「{}」", line.text);
-                log.info("[WhisperX] 行起始时间：{}秒（文档累积时间）", String.format("%.3f", currentTime));
-                log.info("[WhisperX] 共{}个segment", lineAudioSegments.size());
+                log.info("[WhisperX] 行起始时间：{}秒", String.format("%.3f", currentTime));
                 
-                int segmentIndex = 0;
-                for (AudioSegment audioSegment : lineAudioSegments) {
-                    segmentIndex++;
+                int segmentIndexInLine = 0;
+                for (int segIdx = 0; segIdx < lineAudioSegments.size(); segIdx++) {
+                    AudioSegment audioSegment = lineAudioSegments.get(segIdx);
                     
-                    // ✅ Day 9新增：跳过空音频（TTS失败的段落）
+                    // ✅ 使用映射关系获取批量结果的索引（segmentIndexInLine与segIdx一致）
+                    String key = lineIndex + "-" + segIdx;  // ✅ 修复：直接使用segIdx
+                    Integer batchResultIdx = segmentToBatchIndexMap.get(key);
+                    
+                    // 跳过空音频
                     if (audioSegment.getAudioData() == null || audioSegment.getAudioData().length == 0) {
-                        log.warn("[WhisperX] Segment {} 音频为空（TTS失败），跳过", segmentIndex);
-                        continue;
+                        log.debug("[WhisperX] Segment {} 音频为空，跳过", segIdx + 1);
+                        continue;  // ✅ 继续循环，segIdx会自动递增
                     }
                     
-                    // 获取segment对应的文本
-                    String segmentText = audioSegment.getMergedSegment().getText();
+                    List<com.hmall.tts.whisperx.dto.CharTimestamp> whisperXChars = null;
+                    if (batchResults != null && batchResultIdx != null && batchResultIdx < batchResults.size()) {
+                        whisperXChars = batchResults.get(batchResultIdx);
+                    }
                     
-                    log.info("[WhisperX] --- Segment {} ---", segmentIndex);
-                    log.info("[WhisperX] Segment文本：「{}」", segmentText);
-                    log.info("[WhisperX] Segment起始时间：{}秒", String.format("%.3f", segmentStartTime));
+                    double segmentDuration;
                     
-                    // 单独对齐每个segment
-                    AlignmentResult segmentResult = buildCharTimingsWithWhisper(
-                        segmentText,
-                        List.of(audioSegment),  // 只处理单个segment
-                        segmentStartTime,
-                        audioSegment.getAccurateDuration() != null ? 
+                    if (whisperXChars != null && !whisperXChars.isEmpty()) {
+                        // ✅ 使用WhisperX结果
+                        double actualSpeechDuration = whisperXChars.get(whisperXChars.size() - 1).getEndTime();
+                        
+                        List<CharTiming> segmentCharTimings = convertWhisperXToCharTimings(
+                            whisperXChars, segmentStartTime
+                        );
+                        charTimings.addAll(segmentCharTimings);
+                        
+                        segmentDuration = actualSpeechDuration;
+                        log.info("[WhisperX] Segment {} 对齐成功，字符数：{}，时长：{}秒", 
+                                 segIdx + 1, whisperXChars.size(), String.format("%.3f", segmentDuration));
+                    } else {
+                        // ✅ 回退到智能算法
+                        segmentDuration = audioSegment.getAccurateDuration() != null ? 
                             audioSegment.getAccurateDuration() : 
-                            calculateAudioDuration(audioSegment.getAudioData(), voiceConfig.getFormat(), voiceConfig.getSampleRate()),
-                        voiceConfig
-                    );
-                    
-                    // 添加这个segment的字符时间戳
-                    charTimings.addAll(segmentResult.charTimings);
-                    
-                    // ✅ 使用WhisperX实际时长
-                    double segmentDuration = segmentResult.actualSpeechDuration > 0 ? 
-                        segmentResult.actualSpeechDuration : 
-                        (audioSegment.getAccurateDuration() != null ? 
-                            audioSegment.getAccurateDuration() : 
-                            calculateAudioDuration(audioSegment.getAudioData(), voiceConfig.getFormat(), voiceConfig.getSampleRate()));
-                    
-                    log.info("[WhisperX] Segment音频时长：{}秒（WhisperX实际）", String.format("%.3f", segmentDuration));
+                            calculateAudioDuration(audioSegment.getAudioData(), 
+                                voiceConfig.getFormat(), voiceConfig.getSampleRate());
+                        
+                        String segmentText = audioSegment.getMergedSegment().getText();
+                        List<CharTiming> segmentCharTimings = buildCharTimings(
+                            segmentText, segmentStartTime, segmentDuration
+                        );
+                        charTimings.addAll(segmentCharTimings);
+                        
+                        log.warn("[WhisperX] Segment {} 使用智能算法（批量结果缺失），时长：{}秒", 
+                                 segIdx + 1, String.format("%.3f", segmentDuration));
+                    }
                     
                     segmentStartTime += segmentDuration;
-                    actualLineDuration += segmentDuration;  // ← Day 6关键：累加实际语音时长
+                    actualLineDuration += segmentDuration;
                     
                     // 加上停顿时间
                     if (audioSegment.getNeedPause() != null && audioSegment.getNeedPause()) {
                         double pauseSec = (audioSegment.getPauseDuration() != null ? 
                                           audioSegment.getPauseDuration() : 800) / 1000.0;
                         segmentStartTime += pauseSec;
-                        actualLineDuration += pauseSec;  // ← Day 6关键：累加停顿时长
-                        
-                        log.info("[WhisperX] Segment停顿时长：{}秒", String.format("%.3f", pauseSec));
-                        log.info("[WhisperX] Segment结束后累积时间：{}秒", String.format("%.3f", segmentStartTime));
-                    } else {
-                        log.info("[WhisperX] Segment无停顿");
-                        log.info("[WhisperX] Segment结束后累积时间：{}秒", String.format("%.3f", segmentStartTime));
+                        actualLineDuration += pauseSec;
                     }
+                    
+                    // ✅ segIdx由for循环自动递增，无需手动递增
                 }
                 
-                log.info("[WhisperX] === 行 {} 处理完成 ===", lineIndex);
-                log.info("[WhisperX] ✅ 行对齐完成，共{}个字符，实际时长: {}秒 (FFprobe时长: {}秒，差异: {}秒)", 
-                         charTimings.size(),
-                         String.format("%.3f", actualLineDuration),
-                         String.format("%.3f", lineDuration),
-                         String.format("%.3f", Math.abs(actualLineDuration - lineDuration)));
+                log.info("[WhisperX] 行 {} 完成，字符数：{}，实际时长：{}秒", 
+                         lineIndex, charTimings.size(), String.format("%.3f", actualLineDuration));
             }
             
             // 创建DialogSegment（使用WhisperX实际时长）

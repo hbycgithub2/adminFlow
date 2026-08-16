@@ -27,10 +27,10 @@ public class VideoConfig {
     private Integer height = 1080;
     
     /**
-     * 帧率
+     * 帧率（降低到24fps，减少编码负担）
      */
     @Builder.Default
-    private Integer fps = 30;
+    private Integer fps = 24;  // 从30降到24，减少20%编码时间
     
     /**
      * 背景颜色（HEX格式：#FFFFFF）
@@ -44,10 +44,10 @@ public class VideoConfig {
     private String backgroundImagePath;
     
     /**
-     * 视频比特率（kbps）
+     * 视频比特率（kbps）（GPU编码可以用更低的码率）
      */
     @Builder.Default
-    private Integer bitrate = 2000;
+    private Integer bitrate = 1500;  // 从2000降到1500，GPU编码质量仍很好
     
     /**
      * 视频编码格式

@@ -1,70 +1,84 @@
 @echo off
-REM WhisperX常驻服务启动脚本
-REM 作者：Kiro AI Assistant
-REM 日期：2026-08-16
+chcp 65001 > nul
+setlocal enabledelayedexpansion
 
-echo ============================================================
-echo WhisperX常驻服务启动脚本
-echo ============================================================
+title WhisperX HTTP服务（常驻进程模式）
+
+echo ========================================
+echo WhisperX HTTP服务启动脚本
+echo ========================================
 echo.
 
-REM 检查Python 3.13是否存在
-where python313 >nul 2>&1
+:: 检查Python 3.13
+echo [1/3] 检查Python 3.13...
+where py >nul 2>&1
 if %errorlevel% equ 0 (
-    echo [OK] 检测到python313命令
+    py -3.13 --version >nul 2>&1
+    if %errorlevel% equ 0 (
+        set PYTHON_CMD=py -3.13
+        echo ✅ 使用Python: py -3.13
+        goto :START_SERVER
+    )
+)
+
+python313 --version >nul 2>&1
+if %errorlevel% equ 0 (
     set PYTHON_CMD=python313
-    goto :install_flask
+    echo ✅ 使用Python: python313
+    goto :START_SERVER
 )
 
-REM 尝试py -3.13
-py -3.13 --version >nul 2>&1
-if %errorlevel% equ 0 (
-    echo [OK] 检测到py -3.13命令
-    set PYTHON_CMD=py -3.13
-    goto :install_flask
-)
-
-REM 尝试python
 python --version >nul 2>&1
 if %errorlevel% equ 0 (
-    echo [警告] 使用python命令（建议安装Python 3.13）
     set PYTHON_CMD=python
-    goto :install_flask
-) else (
-    echo [错误] 未找到Python！
-    echo 请运行 setup_python311_whisperx.bat 安装Python 3.13
+    echo ⚠️  使用Python: python（可能不是3.13）
+    goto :START_SERVER
+)
+
+echo ❌ 未找到Python 3.13！
+echo.
+echo 请运行以下脚本安装：
+echo   D:\code\adminFlow\scripts\setup_python311_whisperx.bat
+echo.
+pause
+exit /b 1
+
+:START_SERVER
+echo.
+echo [2/3] 检查依赖包...
+%PYTHON_CMD% -c "import whisperx; import flask" >nul 2>&1
+if %errorlevel% neq 0 (
+    echo ❌ WhisperX或Flask未安装！
+    echo.
+    echo 请运行以下脚本安装：
+    echo   D:\code\adminFlow\scripts\install_whisperx_fast.bat
+    echo.
     pause
     exit /b 1
 )
-
-:install_flask
-echo.
-echo [步骤1] 检查Flask依赖...
-%PYTHON_CMD% -c "import flask" >nul 2>&1
-if %errorlevel% neq 0 (
-    echo [安装] Flask未安装，正在安装...
-    %PYTHON_CMD% -m pip install flask flask-cors -i https://pypi.tuna.tsinghua.edu.cn/simple
-    if %errorlevel% neq 0 (
-        echo [错误] Flask安装失败！
-        pause
-        exit /b 1
-    )
-) else (
-    echo [OK] Flask已安装
-)
+echo ✅ 依赖包已安装
 
 echo.
-echo [步骤2] 启动WhisperX服务...
-echo 服务地址: http://localhost:5000
+echo [3/3] 启动服务...
+echo.
+echo ========================================
+echo 服务信息
+echo ========================================
+echo 监听地址: http://localhost:5000
 echo 健康检查: http://localhost:5000/health
-echo 对齐接口: http://localhost:5000/align (POST)
+echo 对齐接口: POST http://localhost:5000/align
+echo 批量接口: POST http://localhost:5000/align_batch
 echo.
-echo 按Ctrl+C停止服务
-echo ============================================================
+echo 提示: 按Ctrl+C可停止服务
+echo ========================================
 echo.
 
-REM 启动服务
-cd /d "%~dp0"
-%PYTHON_CMD% whisperx_server.py
+:: 启动服务
+%PYTHON_CMD% "%~dp0whisperx_server.py"
 
+:: 服务停止
+echo.
+echo ========================================
+echo 服务已停止
+echo ========================================
 pause

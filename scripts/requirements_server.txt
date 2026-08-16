@@ -1,0 +1,17 @@
+# WhisperX服务依赖
+
+# Flask框架
+flask==3.0.0
+werkzeug==3.0.0
+
+# WhisperX（已安装）
+# whisperx（通过pip install git+https://github.com/m-bain/whisperx.git安装）
+
+# PyTorch（已安装）
+# torch==2.3.0+cpu
+# torchaudio==2.3.0+cpu
+
+# 其他依赖（已安装）
+# faster-whisper
+# transformers
+# pyannote.audio
