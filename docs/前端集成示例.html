@@ -1,0 +1,655 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>音频视频生成 - 三合一方案</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+        
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 20px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+            overflow: hidden;
+        }
+        
+        .header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 30px;
+            text-align: center;
+        }
+        
+        .header h1 {
+            font-size: 2em;
+            margin-bottom: 10px;
+        }
+        
+        .header p {
+            opacity: 0.9;
+        }
+        
+        .content {
+            padding: 40px;
+        }
+        
+        .mode-selector {
+            display: flex;
+            gap: 20px;
+            margin-bottom: 40px;
+            justify-content: center;
+        }
+        
+        .mode-btn {
+            padding: 15px 30px;
+            border: 2px solid #667eea;
+            background: white;
+            color: #667eea;
+            border-radius: 10px;
+            cursor: pointer;
+            font-size: 16px;
+            font-weight: bold;
+            transition: all 0.3s;
+        }
+        
+        .mode-btn:hover {
+            background: #667eea;
+            color: white;
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(102, 126, 234, 0.4);
+        }
+        
+        .mode-btn.active {
+            background: #667eea;
+            color: white;
+        }
+        
+        .mode-content {
+            display: none;
+        }
+        
+        .mode-content.active {
+            display: block;
+            animation: fadeIn 0.5s;
+        }
+        
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        
+        .section {
+            background: #f8f9fa;
+            padding: 30px;
+            border-radius: 15px;
+            margin-bottom: 20px;
+        }
+        
+        .section h3 {
+            color: #667eea;
+            margin-bottom: 20px;
+            font-size: 1.5em;
+        }
+        
+        .file-upload {
+            border: 2px dashed #667eea;
+            border-radius: 10px;
+            padding: 40px;
+            text-align: center;
+            cursor: pointer;
+            transition: all 0.3s;
+            background: white;
+        }
+        
+        .file-upload:hover {
+            background: #f0f4ff;
+            border-color: #764ba2;
+        }
+        
+        .file-upload input {
+            display: none;
+        }
+        
+        .file-info {
+            margin-top: 15px;
+            color: #666;
+            font-size: 14px;
+        }
+        
+        .btn {
+            padding: 12px 30px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 16px;
+            font-weight: bold;
+            transition: all 0.3s;
+            margin-top: 15px;
+        }
+        
+        .btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(102, 126, 234, 0.4);
+        }
+        
+        .btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+        
+        .btn-secondary {
+            background: #6c757d;
+        }
+        
+        .result {
+            margin-top: 30px;
+            padding: 20px;
+            background: white;
+            border-radius: 10px;
+            border-left: 4px solid #667eea;
+        }
+        
+        .result h4 {
+            color: #667eea;
+            margin-bottom: 15px;
+        }
+        
+        .result-item {
+            margin: 10px 0;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        
+        .result-item label {
+            font-weight: bold;
+            color: #666;
+        }
+        
+        .result-item a {
+            color: #667eea;
+            text-decoration: none;
+            padding: 5px 15px;
+            border: 1px solid #667eea;
+            border-radius: 5px;
+            transition: all 0.3s;
+        }
+        
+        .result-item a:hover {
+            background: #667eea;
+            color: white;
+        }
+        
+        .loading {
+            display: none;
+            text-align: center;
+            padding: 30px;
+        }
+        
+        .loading.active {
+            display: block;
+        }
+        
+        .spinner {
+            border: 4px solid #f3f3f3;
+            border-top: 4px solid #667eea;
+            border-radius: 50%;
+            width: 50px;
+            height: 50px;
+            animation: spin 1s linear infinite;
+            margin: 0 auto 20px;
+        }
+        
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        
+        .steps {
+            display: flex;
+            gap: 20px;
+            margin-bottom: 30px;
+        }
+        
+        .step {
+            flex: 1;
+            padding: 20px;
+            background: white;
+            border-radius: 10px;
+            text-align: center;
+            opacity: 0.5;
+            transition: all 0.3s;
+        }
+        
+        .step.active {
+            opacity: 1;
+            box-shadow: 0 5px 15px rgba(102, 126, 234, 0.2);
+        }
+        
+        .step-number {
+            width: 40px;
+            height: 40px;
+            background: #667eea;
+            color: white;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin: 0 auto 10px;
+            font-weight: bold;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🎬 音频视频生成工具</h1>
+            <p>方案B：三合一混合方案 - 支持快速生成、灵活编辑、自定义音频</p>
+        </div>
+        
+        <div class="content">
+            <!-- 模式选择 -->
+            <div class="mode-selector">
+                <button class="mode-btn active" onclick="switchMode('quick')">
+                    ⚡ 快速模式
+                </button>
+                <button class="mode-btn" onclick="switchMode('flexible')">
+                    🎨 灵活模式
+                </button>
+                <button class="mode-btn" onclick="switchMode('custom')">
+                    🎵 自定义模式
+                </button>
+            </div>
+            
+            <!-- 快速模式 -->
+            <div id="quick-mode" class="mode-content active">
+                <div class="section">
+                    <h3>⚡ 快速模式 - 一键生成视频</h3>
+                    <p style="color: #666; margin-bottom: 20px;">上传Word文档，一键生成视频，同时获取音频文件</p>
+                    
+                    <div class="file-upload" onclick="document.getElementById('quick-file').click()">
+                        <input type="file" id="quick-file" accept=".docx" onchange="handleQuickFile(event)">
+                        <div>📄 点击选择Word文档</div>
+                        <div class="file-info">支持.docx格式</div>
+                    </div>
+                    
+                    <button class="btn" id="quick-generate-btn" onclick="generateQuick()" disabled>
+                        🚀 一键生成视频
+                    </button>
+                    
+                    <div class="loading" id="quick-loading">
+                        <div class="spinner"></div>
+                        <p>正在生成，请稍候...</p>
+                    </div>
+                    
+                    <div class="result" id="quick-result" style="display: none;">
+                        <h4>✅ 生成成功！</h4>
+                        <div class="result-item">
+                            <label>视频:</label>
+                            <a id="quick-video-link" href="#" target="_blank">📹 查看视频</a>
+                        </div>
+                        <div class="result-item">
+                            <label>音频:</label>
+                            <a id="quick-audio-link" href="#" download>🎵 下载MP3</a>
+                        </div>
+                        <div class="result-item">
+                            <label>时长:</label>
+                            <span id="quick-duration"></span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- 灵活模式 -->
+            <div id="flexible-mode" class="mode-content">
+                <div class="section">
+                    <h3>🎨 灵活模式 - 分步生成</h3>
+                    <p style="color: #666; margin-bottom: 20px;">先生成音频，下载编辑后再生成视频</p>
+                    
+                    <div class="steps">
+                        <div class="step active" id="flexible-step1">
+                            <div class="step-number">1</div>
+                            <div>生成音频</div>
+                        </div>
+                        <div class="step" id="flexible-step2">
+                            <div class="step-number">2</div>
+                            <div>编辑音频</div>
+                        </div>
+                        <div class="step" id="flexible-step3">
+                            <div class="step-number">3</div>
+                            <div>生成视频</div>
+                        </div>
+                    </div>
+                    
+                    <!-- 步骤1：生成音频 -->
+                    <div id="flexible-step1-content">
+                        <h4>步骤1：生成音频</h4>
+                        <div class="file-upload" onclick="document.getElementById('flexible-file').click()">
+                            <input type="file" id="flexible-file" accept=".docx" onchange="handleFlexibleFile(event)">
+                            <div>📄 点击选择Word文档</div>
+                            <div class="file-info">支持.docx格式</div>
+                        </div>
+                        
+                        <button class="btn" id="flexible-audio-btn" onclick="generateAudio()" disabled>
+                            🎵 生成音频
+                        </button>
+                        
+                        <div class="loading" id="flexible-audio-loading">
+                            <div class="spinner"></div>
+                            <p>正在生成音频，请稍候...</p>
+                        </div>
+                        
+                        <div class="result" id="flexible-audio-result" style="display: none;">
+                            <h4>✅ 音频生成成功！</h4>
+                            <div class="result-item">
+                                <label>音频:</label>
+                                <a id="flexible-audio-link" href="#" download>🎵 下载MP3</a>
+                            </div>
+                            <div class="result-item">
+                                <label>时长:</label>
+                                <span id="flexible-audio-duration"></span>
+                            </div>
+                            <p style="color: #666; margin-top: 15px;">
+                                💡 提示：下载MP3后，您可以使用音频编辑软件（如Audacity）进行编辑
+                            </p>
+                            <button class="btn" onclick="goToStep2()">
+                                ➡️ 下一步：上传编辑后的音频
+                            </button>
+                        </div>
+                    </div>
+                    
+                    <!-- 步骤2：上传音频 -->
+                    <div id="flexible-step2-content" style="display: none;">
+                        <h4>步骤2：上传编辑后的音频</h4>
+                        <div class="file-upload" onclick="document.getElementById('flexible-audio-upload').click()">
+                            <input type="file" id="flexible-audio-upload" accept=".mp3,.wav" onchange="handleFlexibleAudio(event)">
+                            <div>🎵 点击选择音频文件</div>
+                            <div class="file-info">支持MP3、WAV格式</div>
+                        </div>
+                        
+                        <button class="btn" id="flexible-video-btn" onclick="generateFlexibleVideo()" disabled>
+                            🎬 生成视频
+                        </button>
+                        
+                        <div class="loading" id="flexible-video-loading">
+                            <div class="spinner"></div>
+                            <p>正在生成视频，请稍候...</p>
+                        </div>
+                        
+                        <div class="result" id="flexible-video-result" style="display: none;">
+                            <h4>✅ 视频生成成功！</h4>
+                            <div class="result-item">
+                                <label>视频:</label>
+                                <a id="flexible-video-link" href="#" target="_blank">📹 查看视频</a>
+                            </div>
+                            <div class="result-item">
+                                <label>重新对齐:</label>
+                                <span id="flexible-realigned"></span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- 自定义模式 -->
+            <div id="custom-mode" class="mode-content">
+                <div class="section">
+                    <h3>🎵 自定义模式 - 使用自己的音频</h3>
+                    <p style="color: #666; margin-bottom: 20px;">上传您自己的音频文件（录音、其他TTS工具生成等）</p>
+                    
+                    <div class="file-upload" onclick="document.getElementById('custom-audio').click()">
+                        <input type="file" id="custom-audio" accept=".mp3,.wav" onchange="handleCustomAudio(event)">
+                        <div>🎵 点击选择音频文件</div>
+                        <div class="file-info">支持MP3、WAV格式</div>
+                    </div>
+                    
+                    <div style="margin-top: 20px;">
+                        <label style="display: block; margin-bottom: 10px; font-weight: bold;">原始文本（用于生成字幕）:</label>
+                        <textarea id="custom-text" rows="5" style="width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 5px;" placeholder="输入音频对应的文字内容..."></textarea>
+                    </div>
+                    
+                    <button class="btn" id="custom-generate-btn" onclick="generateCustomVideo()" disabled>
+                        🎬 生成视频
+                    </button>
+                    
+                    <div class="loading" id="custom-loading">
+                        <div class="spinner"></div>
+                        <p>正在生成视频，请稍候...</p>
+                    </div>
+                    
+                    <div class="result" id="custom-result" style="display: none;">
+                        <h4>✅ 视频生成成功！</h4>
+                        <div class="result-item">
+                            <label>视频:</label>
+                            <a id="custom-video-link" href="#" target="_blank">📹 查看视频</a>
+                        </div>
+                        <div class="result-item">
+                            <label>时长:</label>
+                            <span id="custom-duration"></span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <script>
+        // API基础URL
+        const API_BASE_URL = 'http://localhost:8080';
+        
+        // 全局变量
+        let flexibleSubtitles = null;
+        
+        // 切换模式
+        function switchMode(mode) {
+            // 更新按钮状态
+            document.querySelectorAll('.mode-btn').forEach(btn => btn.classList.remove('active'));
+            event.target.classList.add('active');
+            
+            // 显示对应内容
+            document.querySelectorAll('.mode-content').forEach(content => content.classList.remove('active'));
+            document.getElementById(`${mode}-mode`).classList.add('active');
+        }
+        
+        // 快速模式
+        let quickFile = null;
+        
+        function handleQuickFile(event) {
+            quickFile = event.target.files[0];
+            document.getElementById('quick-generate-btn').disabled = false;
+        }
+        
+        async function generateQuick() {
+            if (!quickFile) return;
+            
+            const formData = new FormData();
+            formData.append('file', quickFile);
+            
+            document.getElementById('quick-generate-btn').disabled = true;
+            document.getElementById('quick-loading').classList.add('active');
+            document.getElementById('quick-result').style.display = 'none';
+            
+            try {
+                const response = await fetch(`${API_BASE_URL}/api/video-generator/generate`, {
+                    method: 'POST',
+                    body: formData
+                });
+                
+                const result = await response.json();
+                
+                if (result.success) {
+                    document.getElementById('quick-video-link').href = API_BASE_URL + result.videoUrl;
+                    document.getElementById('quick-audio-link').href = API_BASE_URL + result.audioUrl;
+                    document.getElementById('quick-duration').textContent = result.duration.toFixed(2) + '秒';
+                    document.getElementById('quick-result').style.display = 'block';
+                } else {
+                    alert('生成失败：' + result.message);
+                }
+            } catch (error) {
+                alert('生成失败：' + error.message);
+            } finally {
+                document.getElementById('quick-loading').classList.remove('active');
+                document.getElementById('quick-generate-btn').disabled = false;
+            }
+        }
+        
+        // 灵活模式
+        let flexibleFile = null;
+        let flexibleAudioFile = null;
+        
+        function handleFlexibleFile(event) {
+            flexibleFile = event.target.files[0];
+            document.getElementById('flexible-audio-btn').disabled = false;
+        }
+        
+        async function generateAudio() {
+            if (!flexibleFile) return;
+            
+            const formData = new FormData();
+            formData.append('file', flexibleFile);
+            
+            document.getElementById('flexible-audio-btn').disabled = true;
+            document.getElementById('flexible-audio-loading').classList.add('active');
+            document.getElementById('flexible-audio-result').style.display = 'none';
+            
+            try {
+                const response = await fetch(`${API_BASE_URL}/api/audio/generate`, {
+                    method: 'POST',
+                    body: formData
+                });
+                
+                const result = await response.json();
+                
+                if (result.success) {
+                    flexibleSubtitles = result.subtitles;
+                    document.getElementById('flexible-audio-link').href = API_BASE_URL + result.audioUrl;
+                    document.getElementById('flexible-audio-duration').textContent = result.duration.toFixed(2) + '秒';
+                    document.getElementById('flexible-audio-result').style.display = 'block';
+                } else {
+                    alert('生成失败：' + result.message);
+                }
+            } catch (error) {
+                alert('生成失败：' + error.message);
+            } finally {
+                document.getElementById('flexible-audio-loading').classList.remove('active');
+                document.getElementById('flexible-audio-btn').disabled = false;
+            }
+        }
+        
+        function goToStep2() {
+            document.getElementById('flexible-step1').classList.remove('active');
+            document.getElementById('flexible-step2').classList.add('active');
+            document.getElementById('flexible-step1-content').style.display = 'none';
+            document.getElementById('flexible-step2-content').style.display = 'block';
+        }
+        
+        function handleFlexibleAudio(event) {
+            flexibleAudioFile = event.target.files[0];
+            document.getElementById('flexible-video-btn').disabled = false;
+        }
+        
+        async function generateFlexibleVideo() {
+            if (!flexibleAudioFile || !flexibleSubtitles) return;
+            
+            const formData = new FormData();
+            formData.append('audio', flexibleAudioFile);
+            formData.append('subtitles', JSON.stringify(flexibleSubtitles));
+            formData.append('forceReAlign', 'true');
+            
+            document.getElementById('flexible-video-btn').disabled = true;
+            document.getElementById('flexible-video-loading').classList.add('active');
+            document.getElementById('flexible-video-result').style.display = 'none';
+            
+            try {
+                const response = await fetch(`${API_BASE_URL}/api/video-generator/generate-from-audio`, {
+                    method: 'POST',
+                    body: formData
+                });
+                
+                const result = await response.json();
+                
+                if (result.success) {
+                    document.getElementById('flexible-video-link').href = API_BASE_URL + result.videoUrl;
+                    document.getElementById('flexible-realigned').textContent = result.reAligned ? '是' : '否';
+                    document.getElementById('flexible-video-result').style.display = 'block';
+                    document.getElementById('flexible-step2').classList.remove('active');
+                    document.getElementById('flexible-step3').classList.add('active');
+                } else {
+                    alert('生成失败：' + result.message);
+                }
+            } catch (error) {
+                alert('生成失败：' + error.message);
+            } finally {
+                document.getElementById('flexible-video-loading').classList.remove('active');
+                document.getElementById('flexible-video-btn').disabled = false;
+            }
+        }
+        
+        // 自定义模式
+        let customAudioFile = null;
+        
+        function handleCustomAudio(event) {
+            customAudioFile = event.target.files[0];
+            document.getElementById('custom-generate-btn').disabled = false;
+        }
+        
+        async function generateCustomVideo() {
+            if (!customAudioFile) return;
+            
+            const originalText = document.getElementById('custom-text').value;
+            
+            if (!originalText) {
+                alert('请输入原始文本');
+                return;
+            }
+            
+            const formData = new FormData();
+            formData.append('audio', customAudioFile);
+            formData.append('originalText', originalText);
+            formData.append('forceReAlign', 'true');
+            
+            document.getElementById('custom-generate-btn').disabled = true;
+            document.getElementById('custom-loading').classList.add('active');
+            document.getElementById('custom-result').style.display = 'none';
+            
+            try {
+                const response = await fetch(`${API_BASE_URL}/api/video-generator/generate-from-audio`, {
+                    method: 'POST',
+                    body: formData
+                });
+                
+                const result = await response.json();
+                
+                if (result.success) {
+                    document.getElementById('custom-video-link').href = API_BASE_URL + result.videoUrl;
+                    document.getElementById('custom-duration').textContent = result.duration.toFixed(2) + '秒';
+                    document.getElementById('custom-result').style.display = 'block';
+                } else {
+                    alert('生成失败：' + result.message);
+                }
+            } catch (error) {
+                alert('生成失败：' + error.message);
+            } finally {
+                document.getElementById('custom-loading').classList.remove('active');
+                document.getElementById('custom-generate-btn').disabled = false;
+            }
+        }
+    </script>
+</body>
+</html>

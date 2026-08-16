@@ -40,20 +40,24 @@ public class CookieBuilder {
             log.error("response为null，无法写入cookie");
             return;
         }
-        Cookie cookie = new Cookie(name, URLEncoder.encode(value, charset));
-        if(StrUtil.isNotBlank(domain)) {
-            cookie.setDomain(domain);
-        }else if (request != null) {
-            String serverName = request.getServerName();
-            serverName = StrUtil.subAfter(serverName, ".", false);
-            cookie.setDomain("." + serverName);
+        try {
+            Cookie cookie = new Cookie(name, URLEncoder.encode(value, charset.name()));
+            if(StrUtil.isNotBlank(domain)) {
+                cookie.setDomain(domain);
+            }else if (request != null) {
+                String serverName = request.getServerName();
+                serverName = StrUtil.subAfter(serverName, ".", false);
+                cookie.setDomain("." + serverName);
+            }
+            cookie.setHttpOnly(httpOnly);
+            cookie.setMaxAge(maxAge);
+            cookie.setPath(path);
+            log.debug("生成cookie，编码方式:{}，【{}={}，domain:{};maxAge={};path={};httpOnly={}】",
+                    charset.name(), name, value, domain, maxAge, path, httpOnly);
+            response.addCookie(cookie);
+        } catch (Exception e) {
+            log.error("构建cookie失败", e);
         }
-        cookie.setHttpOnly(httpOnly);
-        cookie.setMaxAge(maxAge);
-        cookie.setPath(path);
-        log.debug("生成cookie，编码方式:{}，【{}={}，domain:{};maxAge={};path={};httpOnly={}】",
-                charset.name(), name, value, domain, maxAge, path, httpOnly);
-        response.addCookie(cookie);
     }
 
     /**
@@ -62,6 +66,11 @@ public class CookieBuilder {
      * @return 解码后的值
      */
     public String decode(String cookieValue){
-        return URLDecoder.decode(cookieValue, charset);
+        try {
+            return URLDecoder.decode(cookieValue, charset.name());
+        } catch (Exception e) {
+            log.error("解码cookie失败", e);
+            return cookieValue;
+        }
     }
 }

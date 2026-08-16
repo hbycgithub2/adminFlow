@@ -101,10 +101,12 @@ hm:
       - /api/tts/**               # TTS 模块接口（新）
       - /api/volcengine/tts/**    # 火山引擎 TTS 接口
       - /api/document-tts/**      # 文档 TTS 接口（新增）
+      - /api/whisperx/**          # WhisperX 管理接口（新增）
       - /edge-tts-test.html       # Edge TTS 测试页面
       - /tts-test.html            # TTS 测试页面（新）
       - /volcengine-tts-test.html # 火山引擎 TTS 测试页面
       - /document-tts-test.html   # 文档 TTS 测试页面（新增）
+      - /whisperx-manager.html    # WhisperX 管理页面（新增）
       - /**/*.html                # 所有静态 HTML 页面
       - /**/*.js                  # 所有 JS 文件
       - /**/*.css                 # 所有 CSS 文件
@@ -119,11 +121,27 @@ whisperx:
     dir: D:/code/adminFlow/temp/whisperx           # 临时文件目录
   timeout:
     seconds: 120                                    # 超时时间（秒，因为模型加载需要更长时间）
-  # ✅ Day 10批量优化：常驻进程模式（性能提升87%）
+  
+  # ✅ 智能按需启动+自动关闭配置（Day 10批量优化）
   use:
     server: true                                    # 启用HTTP服务（常驻进程模式）
   server:
     url: http://localhost:5000                      # WhisperX服务地址
+    enabled: true                                   # 是否启用服务模式
+    
+    # 按需启动配置（已禁用，改为主类启动）
+    auto-start: false                               # 禁用按需启动（由 HMallApplication 主类启动）
+    python-path: py -3.13                           # Python路径（使用py launcher）
+    script-path: D:/code/adminFlow/scripts/whisperx_server.py  # HTTP服务脚本路径
+    host: localhost                                 # 服务地址
+    port: 5000                                      # 服务端口
+    startup-timeout: 180                            # 启动超时（秒，模型加载需要更长时间）
+    
+    # 自动关闭配置（节省内存）
+    auto-shutdown: true                             # 启用自动关闭
+    idle-timeout-minutes: 30                        # 空闲30分钟后自动关闭
+    check-interval-seconds: 60                      # 每60秒检查一次空闲状态
+  
   batch:
     enabled: true                                   # 启用批量对齐
     size: 50                                        # 每批最多50个segment

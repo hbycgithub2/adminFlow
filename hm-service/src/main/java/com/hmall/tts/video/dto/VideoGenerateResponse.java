@@ -32,9 +32,19 @@ public class VideoGenerateResponse {
     private String videoUrl;
     
     /**
+     * 音频URL（新增：用于下载MP3）⭐
+     */
+    private String audioUrl;
+    
+    /**
      * 视频时长（秒）
      */
     private Double duration;
+    
+    /**
+     * 是否重新对齐（仅从音频生成视频时有效）
+     */
+    private Boolean reAligned;
     
     /**
      * 视频大小（字节）

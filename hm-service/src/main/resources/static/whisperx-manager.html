@@ -1,0 +1,332 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>WhisperX服务管理</title>
+    <style>
+        body { 
+            font-family: 'Segoe UI', Arial, sans-serif; 
+            max-width: 900px; 
+            margin: 30px auto; 
+            padding: 30px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+        }
+        .container {
+            background: white;
+            border-radius: 16px;
+            padding: 40px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+        }
+        h1 {
+            color: #333;
+            margin-bottom: 10px;
+            font-size: 32px;
+        }
+        .subtitle {
+            color: #666;
+            margin-bottom: 30px;
+            font-size: 14px;
+        }
+        .status-box {
+            border: 2px solid #e0e0e0;
+            border-radius: 12px;
+            padding: 25px;
+            margin-bottom: 30px;
+            background: #f9f9f9;
+        }
+        .status-box h2 {
+            margin-top: 0;
+            color: #555;
+            font-size: 20px;
+            margin-bottom: 20px;
+        }
+        .status-item {
+            margin: 15px 0;
+            font-size: 16px;
+            display: flex;
+            align-items: center;
+        }
+        .status-label {
+            font-weight: 600;
+            display: inline-block;
+            width: 180px;
+            color: #555;
+        }
+        .status-value {
+            color: #333;
+            flex: 1;
+        }
+        .status-running {
+            color: #4CAF50;
+            font-weight: bold;
+            font-size: 18px;
+        }
+        .status-stopped {
+            color: #f44336;
+            font-weight: bold;
+            font-size: 18px;
+        }
+        .button-group {
+            display: flex;
+            gap: 15px;
+            margin-top: 30px;
+        }
+        button {
+            flex: 1;
+            padding: 15px 30px;
+            font-size: 16px;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            font-weight: 600;
+            transition: all 0.3s;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+        }
+        .btn-start {
+            background: linear-gradient(135deg, #4CAF50, #45a049);
+            color: white;
+        }
+        .btn-start:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 16px rgba(76, 175, 80, 0.4);
+        }
+        .btn-stop {
+            background: linear-gradient(135deg, #f44336, #d32f2f);
+            color: white;
+        }
+        .btn-stop:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 16px rgba(244, 67, 54, 0.4);
+        }
+        .btn-refresh {
+            background: linear-gradient(135deg, #2196F3, #1976D2);
+            color: white;
+        }
+        .btn-refresh:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 16px rgba(33, 150, 243, 0.4);
+        }
+        button:active {
+            transform: translateY(0);
+        }
+        button:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+            transform: none !important;
+        }
+        .info-box {
+            background: #e3f2fd;
+            border-left: 4px solid #2196F3;
+            padding: 15px 20px;
+            margin-top: 20px;
+            border-radius: 4px;
+        }
+        .info-box h3 {
+            margin: 0 0 10px 0;
+            color: #1976D2;
+            font-size: 16px;
+        }
+        .info-box ul {
+            margin: 0;
+            padding-left: 20px;
+            color: #555;
+        }
+        .info-box li {
+            margin: 5px 0;
+        }
+        .badge {
+            display: inline-block;
+            padding: 4px 12px;
+            border-radius: 12px;
+            font-size: 14px;
+            font-weight: 600;
+        }
+        .badge-success {
+            background: #c8e6c9;
+            color: #2e7d32;
+        }
+        .badge-danger {
+            background: #ffcdd2;
+            color: #c62828;
+        }
+        .badge-warning {
+            background: #fff9c4;
+            color: #f57f17;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🎙️ WhisperX服务管理</h1>
+        <p class="subtitle">智能按需启动 · 30分钟自动关闭 · 节省内存资源</p>
+        
+        <div class="status-box">
+            <h2>📊 服务状态</h2>
+            <div class="status-item">
+                <span class="status-label">服务状态：</span>
+                <span id="serverStatus" class="status-value">检查中...</span>
+            </div>
+            <div class="status-item">
+                <span class="status-label">进程状态：</span>
+                <span id="processStatus" class="status-value">检查中...</span>
+            </div>
+            <div class="status-item">
+                <span class="status-label">最后使用时间：</span>
+                <span id="lastUsed" class="status-value">-</span>
+            </div>
+            <div class="status-item">
+                <span class="status-label">空闲时间：</span>
+                <span id="idleTime" class="status-value">-</span>
+            </div>
+            <div class="status-item">
+                <span class="status-label">自动关闭超时：</span>
+                <span id="idleTimeout" class="status-value">-</span>
+            </div>
+        </div>
+        
+        <div class="button-group">
+            <button class="btn-start" onclick="startServer()">▶️ 启动服务</button>
+            <button class="btn-stop" onclick="stopServer()">⏹️ 停止服务</button>
+            <button class="btn-refresh" onclick="refreshStatus()">🔄 刷新状态</button>
+        </div>
+        
+        <div class="info-box">
+            <h3>ℹ️ 使用说明</h3>
+            <ul>
+                <li><strong>按需启动：</strong>首次生成视频时自动启动（需等待15秒加载模型）</li>
+                <li><strong>快速对齐：</strong>服务启动后，每次对齐仅需2-3秒</li>
+                <li><strong>自动关闭：</strong>空闲30分钟后自动关闭，释放内存（约1-2GB）</li>
+                <li><strong>手动控制：</strong>可随时手动启动或停止服务</li>
+            </ul>
+        </div>
+    </div>
+    
+    <script>
+        // 自动刷新状态
+        refreshStatus();
+        setInterval(refreshStatus, 5000);  // 每5秒刷新一次
+        
+        async function refreshStatus() {
+            try {
+                const response = await fetch('/api/whisperx/status');
+                const data = await response.json();
+                
+                // 更新服务状态
+                const serverStatus = document.getElementById('serverStatus');
+                if (data.serverAvailable) {
+                    serverStatus.innerHTML = '<span class="badge badge-success">✅ 运行中</span>';
+                } else {
+                    serverStatus.innerHTML = '<span class="badge badge-danger">❌ 已停止</span>';
+                }
+                
+                // 更新进程状态
+                const processStatus = document.getElementById('processStatus');
+                if (data.processAlive) {
+                    processStatus.innerHTML = '<span class="badge badge-success">✅ 存活</span>';
+                } else {
+                    processStatus.innerHTML = '<span class="badge badge-danger">❌ 未运行</span>';
+                }
+                
+                // 更新最后使用时间
+                const lastUsed = document.getElementById('lastUsed');
+                if (data.lastUsedTime > 0) {
+                    const date = new Date(data.lastUsedTime);
+                    lastUsed.textContent = date.toLocaleString('zh-CN');
+                } else {
+                    lastUsed.textContent = '从未使用';
+                }
+                
+                // 更新空闲时间
+                const idleTime = document.getElementById('idleTime');
+                if (data.idleMinutes > 0) {
+                    const minutes = data.idleMinutes;
+                    if (minutes >= 60) {
+                        idleTime.innerHTML = `${Math.floor(minutes / 60)} 小时 ${minutes % 60} 分钟`;
+                    } else {
+                        idleTime.innerHTML = minutes + ' 分钟';
+                    }
+                    
+                    // 接近超时时警告
+                    if (data.autoShutdown && minutes >= data.idleTimeoutMinutes - 5) {
+                        idleTime.innerHTML += ' <span class="badge badge-warning">⚠️ 即将自动关闭</span>';
+                    }
+                } else {
+                    idleTime.textContent = '0 分钟';
+                }
+                
+                // 更新超时配置
+                const idleTimeout = document.getElementById('idleTimeout');
+                idleTimeout.textContent = data.idleTimeoutMinutes + ' 分钟（' + 
+                    (data.autoShutdown ? '已启用' : '已禁用') + '）';
+                
+            } catch (error) {
+                console.error('获取状态失败', error);
+                document.getElementById('serverStatus').innerHTML = 
+                    '<span class="badge badge-danger">❌ 无法连接</span>';
+            }
+        }
+        
+        async function startServer() {
+            if (!confirm('确定要启动WhisperX服务吗？\n\n首次启动需要加载模型，大约需要15秒。')) {
+                return;
+            }
+            
+            const btn = event.target;
+            btn.disabled = true;
+            btn.textContent = '⏳ 启动中...';
+            
+            try {
+                const response = await fetch('/api/whisperx/start', {
+                    method: 'POST'
+                });
+                const data = await response.json();
+                
+                if (data.success) {
+                    alert('✅ ' + data.message);
+                } else {
+                    alert('❌ ' + data.message);
+                }
+                
+                // 15秒后刷新状态
+                setTimeout(refreshStatus, 15000);
+            } catch (error) {
+                alert('❌ 启动失败：' + error.message);
+            } finally {
+                btn.disabled = false;
+                btn.textContent = '▶️ 启动服务';
+                refreshStatus();
+            }
+        }
+        
+        async function stopServer() {
+            if (!confirm('确定要停止WhisperX服务吗？\n\n停止后需要重新启动才能使用（首次启动15秒）。')) {
+                return;
+            }
+            
+            const btn = event.target;
+            btn.disabled = true;
+            btn.textContent = '⏳ 停止中...';
+            
+            try {
+                const response = await fetch('/api/whisperx/stop', {
+                    method: 'POST'
+                });
+                const data = await response.json();
+                
+                if (data.success) {
+                    alert('✅ ' + data.message);
+                } else {
+                    alert('❌ ' + data.message);
+                }
+            } catch (error) {
+                alert('❌ 停止失败：' + error.message);
+            } finally {
+                btn.disabled = false;
+                btn.textContent = '⏹️ 停止服务';
+                refreshStatus();
+            }
+        }
+    </script>
+</body>
+</html>

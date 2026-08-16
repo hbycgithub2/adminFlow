@@ -6,7 +6,9 @@ import com.alibaba.fastjson.JSONObject;
 import com.hmall.tts.whisperx.dto.CharTimestamp;
 import com.hmall.tts.whisperx.exception.WhisperXException;
 import com.hmall.tts.whisperx.service.WhisperXService;
+import com.hmall.tts.whisperx.service.WhisperXServerManager;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
@@ -20,20 +22,25 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import java.util.UUID;
+import java.util.concurrent.*;
+import java.util.concurrent.atomic.AtomicLong;
 import org.springframework.web.client.RestTemplate;
 import org.springframework.http.*;
 import java.util.HashMap;
 import java.util.Map;
 
 /**
- * WhisperX强制对齐服务实现类
+ * WhisperX强制对齐服务实现类（使用WhisperXServerManager统一管理服务）
  * 
  * @author Kiro
- * @since 2026-08-15
+ * @since 2026-08-17
  */
 @Slf4j
 @Service
 public class WhisperXServiceImpl implements WhisperXService {
+    
+    @Autowired(required = false)
+    private WhisperXServerManager serverManager;
     
     @Value("${whisperx.python.command:auto}")
     private String pythonCommand;
@@ -53,6 +60,14 @@ public class WhisperXServiceImpl implements WhisperXService {
     @Value("${whisperx.use.server:true}")
     private boolean useServer;
     
+    @Value("${whisperx.server.startup-timeout:180}")
+    private int startupTimeout;
+    
+    /**
+     * 最后使用时间（毫秒）
+     */
+    private final AtomicLong lastUsedTime = new AtomicLong(0);
+    
     /**
      * 实际使用的Python命令（自动检测或配置指定）
      */
@@ -60,14 +75,27 @@ public class WhisperXServiceImpl implements WhisperXService {
     
     /**
      * HTTP客户端（用于调用WhisperX服务）
-     * ✅ Day 10修复：配置超时时间，避免批量对齐超时
      */
     private RestTemplate restTemplate;
     
     /**
-     * 初始化RestTemplate（带超时配置）
+     * 初始化（WhisperX 由 HMallApplication 主类启动）
      */
     @javax.annotation.PostConstruct
+    private void init() {
+        log.info("========================================");
+        log.info("[WhisperX] WhisperX 服务由 HMallApplication 主类管理");
+        log.info("[WhisperX] 按需启动已禁用，只使用已启动的服务");
+        log.info("========================================");
+        
+        initRestTemplate();
+        
+        log.info("[WhisperX] ✅ 服务初始化完成");
+    }
+    
+    /**
+     * 初始化RestTemplate（带超时配置）
+     */
     private void initRestTemplate() {
         // 配置HTTP超时（批量对齐可能需要较长时间）
         org.springframework.http.client.SimpleClientHttpRequestFactory factory = 
@@ -89,14 +117,67 @@ public class WhisperXServiceImpl implements WhisperXService {
     
     @Override
     public List<CharTimestamp> align(byte[] audioData, String originalText) throws Exception {
-        // ✅ 优先使用HTTP服务（常驻进程，速度快）
-        if (useServer && isServerAvailable()) {
-            return alignViaServer(audioData, originalText);
+        // ✅ 更新最后使用时间
+        lastUsedTime.set(System.currentTimeMillis());
+        
+        // ✅ 优先使用HTTP服务
+        if (useServer) {
+            try {
+                // 确保服务已启动
+                ensureServerRunning();
+                
+                if (isServerAvailable()) {
+                    log.debug("[WhisperX] 🚀 使用 HTTP 服务模式（自动模式/手动模式均可用）");
+                    return alignViaServer(audioData, originalText);
+                }
+            } catch (Exception e) {
+                log.warn("[WhisperX] HTTP服务模式失败：{}，回退到Python脚本模式", e.getMessage());
+            }
         }
         
-        // ✅ 回退到Python脚本模式（兼容性）
-        log.warn("[WhisperX] 服务不可用，回退到Python脚本模式");
+        // ✅ 回退到Python脚本模式
+        log.warn("[WhisperX] 使用 Python 脚本模式（较慢）");
         return alignViaScript(audioData, originalText);
+    }
+    
+    /**
+     * 确保WhisperX服务正在运行（只检查，不启动）
+     */
+    private void ensureServerRunning() throws Exception {
+        // 快速检查：如果服务可用，直接返回
+        if (isServerAvailable()) {
+            log.debug("[WhisperX] ✅ 服务已可用");
+            return;
+        }
+        
+        // 服务不可用，抛出异常
+        log.error("[WhisperX] ❌ 服务不可用！请确保 HMallApplication 已启动 WhisperX 服务");
+        log.error("[WhisperX] 💡 提示：WhisperX 服务应该在 Spring Boot 启动时自动启动");
+        log.error("[WhisperX] 💡 检查启动日志中是否有：[WhisperX] ✅ HTTP 服务启动成功！");
+        
+        throw new WhisperXException("WhisperX服务不可用，请检查服务是否已在主类中启动");
+    }
+    
+    /**
+     * 获取服务状态
+     */
+    public Map<String, Object> getServerStatus() {
+        Map<String, Object> status = new HashMap<>();
+        
+        boolean serverAvailable = isServerAvailable();
+        
+        status.put("managedBy", "HMallApplication");  // 进程由主类管理
+        status.put("serverAvailable", serverAvailable);
+        status.put("lastUsedTime", lastUsedTime.get());
+        
+        if (lastUsedTime.get() > 0) {
+            long idleMillis = System.currentTimeMillis() - lastUsedTime.get();
+            status.put("idleMinutes", idleMillis / 60000);
+        } else {
+            status.put("idleMinutes", 0);
+        }
+        
+        return status;
     }
     
     /**

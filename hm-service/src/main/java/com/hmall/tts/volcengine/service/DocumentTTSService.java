@@ -25,6 +25,20 @@ public interface DocumentTTSService {
     DocumentTTSResult generateDocumentSpeech(MultipartFile file, VoiceConfig voiceConfig);
     
     /**
+     * 生成文档对话语音（支持跳过WhisperX对齐）⭐
+     * 
+     * 使用场景：
+     * 1. Manual模式生成音频：skipAlignment=true，使用智能算法（快速）
+     * 2. Auto模式生成视频：skipAlignment=false，使用WhisperX对齐（精确）
+     * 
+     * @param file Word文档文件
+     * @param voiceConfig 音色配置
+     * @param skipAlignment 是否跳过WhisperX对齐（true=跳过，使用智能算法；false=使用WhisperX）
+     * @return 生成结果
+     */
+    DocumentTTSResult generateDocumentSpeech(MultipartFile file, VoiceConfig voiceConfig, boolean skipAlignment);
+    
+    /**
      * 生成文档对话语音（返回字节数组）
      * 
      * @param file Word文档文件

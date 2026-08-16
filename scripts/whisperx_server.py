@@ -59,9 +59,9 @@ def init_models():
     try:
         print(f"[WhisperX Server] 正在加载Whisper base模型...", flush=True)
         whisper_model = whisperx.load_model("base", device=device, compute_type=compute_type)
-        print(f"[WhisperX Server] ✅ Whisper模型加载完成", flush=True)
+        print(f"[WhisperX Server] [OK] Whisper模型加载完成", flush=True)
     except Exception as e:
-        print(f"[WhisperX Server] ❌ 模型加载失败：{e}", flush=True)
+        print(f"[WhisperX Server] [ERROR] 模型加载失败：{e}", flush=True)
         raise
 
 def get_align_model(language):
@@ -75,9 +75,9 @@ def get_align_model(language):
         try:
             align_model, metadata = whisperx.load_align_model(language_code=language, device=device)
             align_models[language] = (align_model, metadata)
-            print(f"[WhisperX Server] ✅ {language}对齐模型加载完成", flush=True)
+            print(f"[WhisperX Server] [OK] {language}对齐模型加载完成", flush=True)
         except Exception as e:
-            print(f"[WhisperX Server] ❌ {language}对齐模型加载失败：{e}", flush=True)
+            print(f"[WhisperX Server] [ERROR] {language}对齐模型加载失败：{e}", flush=True)
             raise
     
     return align_models[language]
@@ -210,7 +210,7 @@ def align():
         
         audio_duration = char_timings[-1]["end"] if char_timings else 0.0
         
-        print(f"[WhisperX Server] ✅ 对齐完成，字符数：{len(char_timings)}", flush=True)
+        print(f"[WhisperX Server] [OK] 对齐完成，字符数：{len(char_timings)}", flush=True)
         
         return jsonify({
             "success": True,
@@ -221,7 +221,7 @@ def align():
         
     except Exception as e:
         error_detail = traceback.format_exc()
-        print(f"[WhisperX Server] ❌ 对齐失败：{error_detail}", flush=True)
+        print(f"[WhisperX Server] [ERROR] 对齐失败：{error_detail}", flush=True)
         return jsonify({
             "success": False,
             "error": str(e),
@@ -354,17 +354,17 @@ def align_batch():
                     "characters": char_timings
                 })
                 
-                print(f"[WhisperX Server] ✅ 第{i+1}/{len(requests_list)}个完成", flush=True)
+                print(f"[WhisperX Server] [OK] 第{i+1}/{len(requests_list)}个完成", flush=True)
                 
             except Exception as e:
                 error_detail = traceback.format_exc()
-                print(f"[WhisperX Server] ❌ 第{i+1}个失败：{error_detail}", flush=True)
+                print(f"[WhisperX Server] [ERROR] 第{i+1}个失败：{error_detail}", flush=True)
                 results.append({
                     "success": False,
                     "error": str(e)
                 })
         
-        print(f"[WhisperX Server] ✅ 批量对齐完成", flush=True)
+        print(f"[WhisperX Server] [OK] 批量对齐完成", flush=True)
         
         return jsonify({
             "success": True,
@@ -373,7 +373,7 @@ def align_batch():
         
     except Exception as e:
         error_detail = traceback.format_exc()
-        print(f"[WhisperX Server] ❌ 批量对齐失败：{error_detail}", flush=True)
+        print(f"[WhisperX Server] [ERROR] 批量对齐失败：{error_detail}", flush=True)
         return jsonify({
             "success": False,
             "error": str(e),

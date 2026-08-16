@@ -39,6 +39,9 @@ public class VideoGeneratorServiceImpl implements VideoGeneratorService {
     @Autowired
     private FFmpegUtil ffmpegUtil;
     
+    @Autowired
+    private com.hmall.tts.subtitle.service.SubtitleAlignmentService subtitleAlignmentService;
+    
     @Value("${tts.output.dir:./tts}")
     private String outputDir;
     
@@ -151,6 +154,7 @@ public class VideoGeneratorServiceImpl implements VideoGeneratorService {
                     .message("视频生成成功")
                     .taskId(taskId)
                     .videoUrl("/tts/videos/" + videoFileName)
+                    .audioUrl(audioUrl)  // ⭐ 新增：返回音频URL
                     .duration(duration)
                     .videoSize(videoFile.length())
                     .subtitles(subtitleSegments)
@@ -164,6 +168,128 @@ public class VideoGeneratorServiceImpl implements VideoGeneratorService {
                     .taskId(taskId)
                     .build();
         }
+    }
+    
+    @Override
+    public VideoGenerateResponse generateVideoFromAudio(MultipartFile audioFile, VideoFromAudioRequest request) throws Exception {
+        log.info("开始从音频生成视频，文件名：{}", audioFile.getOriginalFilename());
+        
+        String taskId = UUID.randomUUID().toString();
+        
+        try {
+            // 步骤1：保存音频文件
+            log.info("[{}] 步骤1：保存音频文件", taskId);
+            String audioFileName = taskId + "_" + audioFile.getOriginalFilename();
+            Path audioPath = saveAudioFile(audioFile, audioFileName);
+            log.info("[{}] 音频文件已保存：{}", taskId, audioPath);
+            
+            // 步骤2：智能对齐字幕
+            log.info("[{}] 步骤2：智能对齐字幕", taskId);
+            byte[] audioData = audioFile.getBytes();
+            
+            List<DialogSegment> dialogSegments = subtitleAlignmentService.alignSubtitles(
+                    audioData,
+                    request.getSubtitles(),
+                    request.getOriginalText(),
+                    Boolean.TRUE.equals(request.getForceReAlign())
+            );
+            
+            if (dialogSegments == null || dialogSegments.isEmpty()) {
+                log.error("[{}] 字幕对齐失败或生成的字幕为空", taskId);
+                return VideoGenerateResponse.builder()
+                        .success(false)
+                        .message("字幕对齐失败：无法生成有效的字幕数据")
+                        .taskId(taskId)
+                        .build();
+            }
+            
+            log.info("[{}] 字幕对齐完成，共{}个字幕片段", taskId, dialogSegments.size());
+            
+            // 步骤3：转换为字幕片段
+            List<SubtitleSegment> subtitleSegments = convertToSubtitleSegments(dialogSegments);
+            
+            // 步骤4：生成ASS字幕文件
+            log.info("[{}] 步骤3：生成ASS字幕文件", taskId);
+            VideoConfig videoConfig = request.getVideoConfig();
+            if (videoConfig == null) {
+                videoConfig = VideoConfig.builder().build(); // 使用默认配置
+            }
+            
+            SubtitleConfig subtitleConfig = request.getSubtitleConfig();
+            if (subtitleConfig == null) {
+                subtitleConfig = SubtitleConfig.builder().build(); // 使用默认配置
+            }
+            
+            String assContent = assSubtitleGenerator.generateASS(
+                    subtitleSegments,
+                    subtitleConfig,
+                    videoConfig.getWidth(),
+                    videoConfig.getHeight()
+            );
+            
+            // 保存ASS字幕文件
+            String assFileName = taskId + ".ass";
+            Path assPath = saveToFile(assContent.getBytes("UTF-8"), assFileName);
+            log.info("[{}] ASS字幕文件已保存：{}", taskId, assPath);
+            
+            // 步骤5：调用FFmpeg生成视频
+            log.info("[{}] 步骤4：调用FFmpeg生成视频", taskId);
+            String videoFileName = taskId + ".mp4";
+            Path videoPath = Paths.get(outputDir, "videos", videoFileName);
+            Files.createDirectories(videoPath.getParent());
+            
+            ffmpegUtil.generateVideo(
+                    audioPath.toString(),
+                    assPath.toString(),
+                    videoPath.toString(),
+                    videoConfig
+            );
+            
+            // 步骤6：构建响应
+            log.info("[{}] 视频生成成功", taskId);
+            File videoFile = videoPath.toFile();
+            
+            double duration = calculateTotalDuration(subtitleSegments);
+            
+            // 检查是否重新对齐
+            boolean reAligned = Boolean.TRUE.equals(request.getForceReAlign()) ||
+                               subtitleAlignmentService.isAudioModified(audioData, request.getSubtitles());
+            
+            log.info("[{}] 视频生成完成，总时长：{}秒，字幕片段数：{}，重新对齐：{}", 
+                    taskId, duration, subtitleSegments.size(), reAligned);
+            
+            return VideoGenerateResponse.builder()
+                    .success(true)
+                    .message("视频生成成功")
+                    .taskId(taskId)
+                    .videoUrl("/tts/videos/" + videoFileName)
+                    .duration(duration)
+                    .videoSize(videoFile.length())
+                    .subtitles(subtitleSegments)
+                    .reAligned(reAligned)
+                    .build();
+                    
+        } catch (Exception e) {
+            log.error("[{}] 从音频生成视频失败", taskId, e);
+            return VideoGenerateResponse.builder()
+                    .success(false)
+                    .message("视频生成失败：" + e.getMessage())
+                    .taskId(taskId)
+                    .build();
+        }
+    }
+    
+    /**
+     * 保存音频文件
+     */
+    private Path saveAudioFile(MultipartFile audioFile, String fileName) throws Exception {
+        Path directory = Paths.get(outputDir, "audios");
+        Files.createDirectories(directory);
+        
+        Path filePath = directory.resolve(fileName);
+        Files.write(filePath, audioFile.getBytes());
+        
+        return filePath;
     }
     
     /**

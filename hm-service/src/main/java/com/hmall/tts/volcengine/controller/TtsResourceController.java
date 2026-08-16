@@ -1,5 +1,7 @@
 package com.hmall.tts.volcengine.controller;
 
+import com.hmall.tts.volcengine.config.VolcengineConfig;
+import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.core.io.FileSystemResource;
 import org.springframework.core.io.Resource;
@@ -11,7 +13,6 @@ import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
-import java.io.File;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
@@ -26,7 +27,10 @@ import java.nio.file.Paths;
 @Slf4j
 @RestController
 @RequestMapping("/tts")
+@RequiredArgsConstructor
 public class TtsResourceController {
+    
+    private final VolcengineConfig config;
     
     /**
      * 下载文档TTS生成的音频文件
@@ -36,15 +40,14 @@ public class TtsResourceController {
         try {
             log.info("请求下载音频文件: {}", fileName);
             
-            // 获取文件路径
-            String outputDir = System.getProperty("user.home") + File.separator + "tts-output";
-            Path filePath = Paths.get(outputDir, "documents", fileName);
+            // 从配置读取路径（统一使用DocumentTTSService的保存路径）
+            Path filePath = Paths.get(config.getOutputDir(), "documents", fileName);
             
             log.info("音频文件路径: {}", filePath.toAbsolutePath());
             
             // 检查文件是否存在
             if (!Files.exists(filePath)) {
-                log.error("音频文件不存在: {}", filePath);
+                log.error("音频文件不存在: {}", filePath.toAbsolutePath());
                 return ResponseEntity.notFound().build();
             }
             
@@ -69,14 +72,14 @@ public class TtsResourceController {
             headers.setContentLength(fileSize);
             headers.setCacheControl("no-cache");
             
-            log.info("返回音频文件: {}, 类型: {}, 大小: {} bytes", fileName, contentType, fileSize);
+            log.info("✅ 返回音频文件: {}, 类型: {}, 大小: {} bytes", fileName, contentType, fileSize);
             
             return ResponseEntity.ok()
                     .headers(headers)
                     .body(resource);
             
         } catch (Exception e) {
-            log.error("下载音频文件失败: {}, 错误: {}", fileName, e.getMessage(), e);
+            log.error("❌ 下载音频文件失败: {}, 错误: {}", fileName, e.getMessage(), e);
             return ResponseEntity.internalServerError().build();
         }
     }

@@ -39,6 +39,10 @@ public class MvcConfig implements WebMvcConfigurer {
 
     @Override
     public void addInterceptors(InterceptorRegistry registry) {
+        // ==================== Token权限验证已禁用 ====================
+        // 如需启用，取消下面代码的注释
+        
+        /*
         // 1.添加拦截器
         LoginInterceptor loginInterceptor = new LoginInterceptor(jwtTool);
         InterceptorRegistration registration = registry.addInterceptor(loginInterceptor);
@@ -63,11 +67,13 @@ public class MvcConfig implements WebMvcConfigurer {
                 "/tts/**",  // TTS音频文件访问
                 "/api/document-tts/**",  // TTS API接口
                 "/api/video-generator/**",  // 视频生成API接口（无需认证）
+                "/api/audio/**",  // 音频生成API接口（无需认证）⭐ 新增
                 "/api/subtitle-editor/**",  // 字幕编辑API接口（无需认证）
                 "/subtitle-editor.html",  // 字幕编辑器页面
                 "/video-generator-test.html",  // 视频生成测试页面
                 "/document-tts-test.html"  // 文档TTS测试页面
                 );
+        */
 
     }
 }
