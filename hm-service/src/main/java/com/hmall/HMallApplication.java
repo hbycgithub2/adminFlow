@@ -14,6 +14,7 @@ import java.util.List;
 @Slf4j
 @MapperScan("com.hmall.mapper")
 @SpringBootApplication
+@org.springframework.scheduling.annotation.EnableAsync  // ⭐ 启用异步支持（用于局部编辑功能）
 public class HMallApplication {
     
     private static Process whisperxProcess = null;

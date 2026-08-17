@@ -149,6 +149,14 @@ public class VideoGeneratorServiceImpl implements VideoGeneratorService {
             
             log.info("[{}] 视频生成完成，总时长：{}秒，字幕片段数：{}", taskId, duration, subtitleSegments.size());
             
+            // ⭐ 步骤7：保存元数据（支持后续局部编辑）
+            try {
+                saveTaskMetadata(taskId, dialogSegments, voiceConfig, videoConfig, subtitleConfig, audioPath);
+                log.info("[{}] 元数据已保存，支持局部编辑", taskId);
+            } catch (Exception e) {
+                log.warn("[{}] 元数据保存失败（不影响视频生成）：{}", taskId, e.getMessage());
+            }
+            
             return VideoGenerateResponse.builder()
                     .success(true)
                     .message("视频生成成功")
@@ -398,5 +406,70 @@ public class VideoGeneratorServiceImpl implements VideoGeneratorService {
         
         SubtitleSegment lastSegment = segments.get(segments.size() - 1);
         return lastSegment.getStartTime() + lastSegment.getDuration();
+    }
+    
+    /**
+     * 保存任务元数据（支持局部编辑）
+     * 
+     * 策略：
+     * - 初始生成时，不保存每个段落的音频数据（避免文件过大）
+     * - 只保存fullAudioPath + 时间戳信息
+     * - 编辑时，从fullAudioPath按时间戳切割音频
+     */
+    private void saveTaskMetadata(String taskId, 
+                                  List<DialogSegment> dialogSegments,
+                                  VoiceConfig voiceConfig,
+                                  VideoConfig videoConfig,
+                                  SubtitleConfig subtitleConfig,
+                                  Path audioPath) throws Exception {
+        
+        // 构建SegmentMetadata列表
+        List<com.hmall.tts.volcengine.dto.SegmentMetadata> segments = new ArrayList<>();
+        
+        for (int i = 0; i < dialogSegments.size(); i++) {
+            DialogSegment dialog = dialogSegments.get(i);
+            
+            // ⭐ 关键修复：不保存audioDataBase64（避免文件过大）
+            // 编辑时从fullAudioPath按时间戳切割
+            com.hmall.tts.volcengine.dto.SegmentMetadata segmentMetadata = 
+                    com.hmall.tts.volcengine.dto.SegmentMetadata.builder()
+                    .index(i)
+                    .text(dialog.getText())
+                    .voiceId(dialog.getVoiceId())
+                    .isBold(dialog.getIsBold())
+                    .startTime(dialog.getStartTime())
+                    .duration(dialog.getDuration())
+                    .endTime(dialog.getStartTime() + dialog.getDuration())
+                    .needPause(i < dialogSegments.size() - 1)  // 除了最后一个，都需要停顿
+                    .pauseDuration(800)
+                    .audioDataBase64("")  // ⭐ 初始为空，编辑时才切割
+                    .build();
+            
+            segments.add(segmentMetadata);
+        }
+        
+        // 构建TaskMetadata
+        com.hmall.tts.volcengine.dto.TaskMetadata taskMetadata = 
+                com.hmall.tts.volcengine.dto.TaskMetadata.builder()
+                .taskId(taskId)
+                .segments(segments)
+                .voiceConfig(voiceConfig)
+                .videoConfig(videoConfig)
+                .subtitleConfig(subtitleConfig)
+                .createTime(System.currentTimeMillis())
+                .updateTime(System.currentTimeMillis())
+                .fullAudioPath(audioPath.toString())  // ⭐ 保存音频路径引用
+                .build();
+        
+        // 保存为JSON文件
+        Path metadataPath = Paths.get(outputDir, "temp", taskId + ".json");
+        Files.createDirectories(metadataPath.getParent());
+        
+        com.fasterxml.jackson.databind.ObjectMapper objectMapper = new com.fasterxml.jackson.databind.ObjectMapper();
+        String json = objectMapper.writerWithDefaultPrettyPrinter().writeValueAsString(taskMetadata);
+        Files.write(metadataPath, json.getBytes("UTF-8"));
+        
+        log.debug("[保存元数据] 任务ID={}, 段落数={}, 文件大小={} KB, 音频路径={}", 
+                 taskId, segments.size(), json.length() / 1024.0, audioPath);
     }
 }
