@@ -1,0 +1,58 @@
+✅ 编译完成！现在需要重启服务
+
+==========================================
+重要提示：必须重启服务才能生效！
+==========================================
+
+步骤1：停止当前服务
+--------------------
+在运行服务的窗口按：Ctrl + C
+
+步骤2：重新启动服务
+--------------------
+使用以下任意一种方法：
+
+方法A（Maven）：
+cd d:\code\adminFlow\hm-service
+mvn spring-boot:run
+
+方法B（IDE - 最简单）：
+1. 在IDEA中找到 HmServiceApplication.java
+2. 右键 → Run
+
+方法C（jar包）：
+cd d:\code\adminFlow\hm-service
+java -jar target\hm-service-1.0.0.jar
+
+步骤3：等待启动完成
+--------------------
+看到以下日志说明成功：
+Started HmServiceApplication in X.XXX seconds
+
+步骤4：测试
+--------------------
+1. 打开：http://localhost:8080/document-tts-test.html
+2. 启用多音色模式
+3. 选择6种音色
+4. 上传Word文档
+5. 点击"生成音频"
+
+步骤5：查看日志（关键！）
+--------------------
+必须看到以下日志：
+
+==========================================
+🔍 WordDocumentParser.parse() 被调用！
+🔍 multiVoiceMode=true
+🔍 blueVoice=zh_female_m191_uranus_bigtts
+🔍 redVoice=zh_female_xiaolu_uranus_bigtts
+🔍 greenVoice=ICL_uranus_zh_male_ruyacaijun_tob
+🔍 purpleVoice=ICL_uranus_zh_female_wenrouwenya_tob
+==========================================
+🎤 解析文本片段: text='蓝色文字', colorRGB=0070C0, speaker=zh_female_m191_uranus_bigtts
+🎤 解析文本片段: text='红色文字', colorRGB=C00000, speaker=zh_female_xiaolu_uranus_bigtts
+🎤 解析文本片段: text='绿色文字', colorRGB=00B050, speaker=ICL_uranus_zh_male_ruyacaijun_tob
+🎤 解析文本片段: text='紫色文字', colorRGB=7030A0, speaker=ICL_uranus_zh_female_wenrouwenya_tob
+
+如果看到这个日志，说明修改已生效！
+如果看不到，说明服务没有重启。

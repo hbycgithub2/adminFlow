@@ -39,10 +39,23 @@ public class DocumentTTSController {
             @RequestParam(value = "boldVoice", defaultValue = "zh_male_m191_uranus_bigtts") String boldVoice,
             @RequestParam(value = "normalVoice", defaultValue = "zh_female_vv_uranus_bigtts") String normalVoice,
             @RequestParam(value = "format", defaultValue = "mp3") String format,
-            @RequestParam(value = "sampleRate", defaultValue = "24000") Integer sampleRate
+            @RequestParam(value = "sampleRate", defaultValue = "24000") Integer sampleRate,
+            // 多音色模式参数
+            @RequestParam(value = "multiVoiceMode", required = false) String multiVoiceMode,
+            @RequestParam(value = "blueVoice", required = false) String blueVoice,
+            @RequestParam(value = "redVoice", required = false) String redVoice,
+            @RequestParam(value = "greenVoice", required = false) String greenVoice,
+            @RequestParam(value = "purpleVoice", required = false) String purpleVoice
     ) {
-        log.info("收到文档TTS请求: 文件={}, 加粗音色={}, 非加粗音色={}", 
-                file.getOriginalFilename(), boldVoice, normalVoice);
+        boolean isMultiVoice = "true".equals(multiVoiceMode);
+        
+        if (isMultiVoice) {
+            log.info("收到文档TTS请求: 文件={}, 多音色模式=启用, 蓝={}, 红={}, 绿={}, 紫={}", 
+                    file.getOriginalFilename(), blueVoice, redVoice, greenVoice, purpleVoice);
+        } else {
+            log.info("收到文档TTS请求: 文件={}, 加粗音色={}, 非加粗音色={}", 
+                    file.getOriginalFilename(), boldVoice, normalVoice);
+        }
         
         try {
             VoiceConfig voiceConfig = VoiceConfig.builder()
@@ -50,6 +63,11 @@ public class DocumentTTSController {
                     .normalVoice(normalVoice)
                     .format(format)
                     .sampleRate(sampleRate)
+                    .multiVoiceMode(isMultiVoice)
+                    .blueVoice(blueVoice)
+                    .redVoice(redVoice)
+                    .greenVoice(greenVoice)
+                    .purpleVoice(purpleVoice)
                     .build();
             
             DocumentTTSResult result = documentTTSService.generateDocumentSpeech(file, voiceConfig);
@@ -79,10 +97,22 @@ public class DocumentTTSController {
             @RequestParam(value = "boldVoice", defaultValue = "zh_male_m191_uranus_bigtts") String boldVoice,
             @RequestParam(value = "normalVoice", defaultValue = "zh_female_vv_uranus_bigtts") String normalVoice,
             @RequestParam(value = "format", defaultValue = "mp3") String format,
-            @RequestParam(value = "sampleRate", defaultValue = "24000") Integer sampleRate
+            @RequestParam(value = "sampleRate", defaultValue = "24000") Integer sampleRate,
+            // 多音色模式参数
+            @RequestParam(value = "multiVoiceMode", required = false) String multiVoiceMode,
+            @RequestParam(value = "blueVoice", required = false) String blueVoice,
+            @RequestParam(value = "redVoice", required = false) String redVoice,
+            @RequestParam(value = "greenVoice", required = false) String greenVoice,
+            @RequestParam(value = "purpleVoice", required = false) String purpleVoice
     ) {
-        log.info("收到文档TTS流式请求: 文件={}, 加粗音色={}, 非加粗音色={}", 
-                file.getOriginalFilename(), boldVoice, normalVoice);
+        boolean isMultiVoice = "true".equals(multiVoiceMode);
+        
+        if (isMultiVoice) {
+            log.info("收到文档TTS流式请求: 文件={}, 多音色模式=启用", file.getOriginalFilename());
+        } else {
+            log.info("收到文档TTS流式请求: 文件={}, 加粗音色={}, 非加粗音色={}", 
+                    file.getOriginalFilename(), boldVoice, normalVoice);
+        }
         
         try {
             VoiceConfig voiceConfig = VoiceConfig.builder()
@@ -90,6 +120,11 @@ public class DocumentTTSController {
                     .normalVoice(normalVoice)
                     .format(format)
                     .sampleRate(sampleRate)
+                    .multiVoiceMode(isMultiVoice)
+                    .blueVoice(blueVoice)
+                    .redVoice(redVoice)
+                    .greenVoice(greenVoice)
+                    .purpleVoice(purpleVoice)
                     .build();
             
             byte[] audioData = documentTTSService.generateDocumentSpeechBytes(file, voiceConfig);

@@ -3,6 +3,7 @@ package com.hmall.tts.video.controller;
 import com.hmall.tts.video.animation.AnimationType;
 import com.hmall.tts.video.dto.*;
 import com.hmall.tts.video.service.VideoGeneratorService;
+import com.hmall.tts.volcengine.dto.VoiceConfig;
 import io.swagger.annotations.Api;
 import io.swagger.annotations.ApiOperation;
 import lombok.extern.slf4j.Slf4j;
@@ -40,6 +41,12 @@ public class VideoGeneratorController {
             @RequestParam(value = "normalVoice", defaultValue = "zh_female_vv_uranus_bigtts") String normalVoice,
             @RequestParam(value = "audioFormat", defaultValue = "mp3") String audioFormat,
             @RequestParam(value = "sampleRate", defaultValue = "24000") Integer sampleRate,
+            // 多音色模式参数
+            @RequestParam(value = "multiVoiceMode", required = false) String multiVoiceMode,
+            @RequestParam(value = "blueVoice", required = false) String blueVoice,
+            @RequestParam(value = "redVoice", required = false) String redVoice,
+            @RequestParam(value = "greenVoice", required = false) String greenVoice,
+            @RequestParam(value = "purpleVoice", required = false) String purpleVoice,
             // 视频配置
             @RequestParam(value = "videoWidth", defaultValue = "1920") Integer videoWidth,
             @RequestParam(value = "videoHeight", defaultValue = "1080") Integer videoHeight,
@@ -57,7 +64,14 @@ public class VideoGeneratorController {
             @RequestParam(value = "animationType", defaultValue = "fade") String animationType
     ) {
         try {
-            log.info("收到视频生成请求：文件名={}, 动画类型={}", file.getOriginalFilename(), animationType);
+            boolean isMultiVoice = "true".equals(multiVoiceMode);
+            if (isMultiVoice) {
+                log.info("收到视频生成请求：文件名={}, 动画类型={}, 多音色模式=启用", 
+                        file.getOriginalFilename(), animationType);
+            } else {
+                log.info("收到视频生成请求：文件名={}, 动画类型={}", 
+                        file.getOriginalFilename(), animationType);
+            }
             
             // 构建视频配置
             VideoConfig videoConfig = VideoConfig.builder()
@@ -80,6 +94,19 @@ public class VideoGeneratorController {
                     .animationType(AnimationType.fromCode(animationType))
                     .build();
             
+            // 构建音色配置（支持多音色模式）
+            VoiceConfig voiceConfig = VoiceConfig.builder()
+                    .boldVoice(boldVoice)
+                    .normalVoice(normalVoice)
+                    .format(audioFormat)
+                    .sampleRate(sampleRate)
+                    .multiVoiceMode(isMultiVoice)
+                    .blueVoice(blueVoice)
+                    .redVoice(redVoice)
+                    .greenVoice(greenVoice)
+                    .purpleVoice(purpleVoice)
+                    .build();
+            
             // 构建请求
             VideoGenerateRequest request = VideoGenerateRequest.builder()
                     .boldVoice(boldVoice)
@@ -88,6 +115,7 @@ public class VideoGeneratorController {
                     .sampleRate(sampleRate)
                     .videoConfig(videoConfig)
                     .subtitleConfig(subtitleConfig)
+                    .voiceConfig(voiceConfig)  // 传递完整的音色配置
                     .build();
             
             // 生成视频

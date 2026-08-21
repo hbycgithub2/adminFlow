@@ -315,6 +315,204 @@
             color: #2e7d32; /* 绿色 */
         }
 
+        /* 音色选择器容器（下拉框+试听按钮） */
+        .voice-selector-row {
+            display: flex;
+            gap: 10px;
+            align-items: center;
+        }
+
+        .voice-selector-row select {
+            flex: 1;
+        }
+
+        .listen-btn {
+            width: 100px;
+            padding: 12px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            border-radius: 8px;
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s;
+            box-shadow: 0 2px 8px rgba(102, 126, 234, 0.3);
+        }
+
+        .listen-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(102, 126, 234, 0.5);
+        }
+
+        .listen-btn:active {
+            transform: translateY(0);
+        }
+
+        .listen-btn.playing {
+            background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+        }
+
+        /* 多音色模式切换按钮 */
+        .toggle-multi-voice-btn {
+            width: 100%;
+            padding: 14px;
+            background: #E7F3FF;
+            border: 2px dashed #0070C0;
+            border-radius: 8px;
+            font-size: 15px;
+            font-weight: 600;
+            color: #0070C0;
+            cursor: pointer;
+            transition: all 0.3s;
+            margin-top: 20px;
+        }
+
+        .toggle-multi-voice-btn:hover {
+            background: #D0E8FF;
+            transform: translateY(-2px);
+        }
+
+        .toggle-multi-voice-btn.active {
+            background: #F5F5F5;
+            border-color: #999;
+            color: #666;
+        }
+
+        /* 彩色音色面板 */
+        .color-voice-panel {
+            margin-top: 20px;
+            padding: 20px;
+            background: #F8F9FA;
+            border: 2px solid #667eea;
+            border-radius: 8px;
+            display: none;
+            animation: slideDown 0.3s ease-out;
+        }
+
+        .color-voice-panel.show {
+            display: block;
+        }
+
+        @keyframes slideDown {
+            from {
+                opacity: 0;
+                transform: translateY(-10px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .color-voice-title {
+            font-size: 16px;
+            font-weight: 600;
+            color: #333;
+            margin-bottom: 15px;
+            padding-bottom: 10px;
+            border-bottom: 2px solid #667eea;
+        }
+
+        /* 彩色音色网格（两列布局） */
+        .voice-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 15px;
+            width: 100%;
+        }
+
+        /* 单个彩色音色卡片 */
+        .voice-card {
+            background: #fff;
+            border: 2px solid #ccc;
+            border-radius: 8px;
+            padding: 15px;
+            transition: all 0.3s;
+            width: 100%;
+            box-sizing: border-box;
+        }
+
+        .voice-card:hover {
+            box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+            transform: translateY(-2px);
+        }
+
+        .voice-card.blue {
+            border-color: #0070C0;
+            background: #F0F8FF;
+        }
+
+        .voice-card.red {
+            border-color: #C00000;
+            background: #FFF5F5;
+        }
+
+        .voice-card.green {
+            border-color: #00B050;
+            background: #F0FFF0;
+        }
+
+        .voice-card.purple {
+            border-color: #7030A0;
+            background: #F8F0FF;
+        }
+
+        .color-label {
+            font-size: 14px;
+            font-weight: 600;
+            margin-bottom: 10px;
+            display: flex;
+            align-items: center;
+        }
+
+        .color-dot {
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            margin-right: 6px;
+        }
+
+        .color-dot.blue {
+            background: #0070C0;
+        }
+
+        .color-dot.red {
+            background: #C00000;
+        }
+
+        .color-dot.green {
+            background: #00B050;
+        }
+
+        .color-dot.purple {
+            background: #7030A0;
+        }
+
+        .voice-card select {
+            width: 100%;
+            margin-bottom: 10px;
+        }
+
+        .voice-card .listen-btn {
+            width: 100%;
+        }
+
+        /* 响应式设计 */
+        @media (max-width: 768px) {
+            .voice-grid {
+                grid-template-columns: 1fr;
+            }
+            
+            .voice-selector-row {
+                flex-direction: column;
+            }
+            
+            .listen-btn {
+                width: 100%;
+            }
+        }
+
         /* 正在播放的字符 - 深黄色 + 加粗 + 放大 */
         .char.char-playing {
             color: #f57f17 !important;
@@ -386,36 +584,88 @@
                 
                 <div class="form-group">
                     <label>加粗文本音色：</label>
-                    <select id="boldVoice">
-                        <optgroup label="👨 男声">
-                            <option value="zh_male_m191_uranus_bigtts" selected>云舟（沉稳男声）</option>
-                            <option value="zh_male_taocheng_uranus_bigtts">小天（阳光男声）</option>
-                        </optgroup>
-                        <optgroup label="👩 女声">
-                            <option value="zh_female_vv_uranus_bigtts">薇薇（温柔女声）</option>
-                            <option value="zh_female_xiaohe_uranus_bigtts">小何（甜美女声）</option>
-                        </optgroup>
-                    </select>
+                    <div class="voice-selector-row">
+                        <select id="boldVoice">
+                            <!-- 音色选项由JavaScript动态生成 -->
+                        </select>
+                        <button class="listen-btn" onclick="playVoicePreview('boldVoice', this)">🔊 试听</button>
+                    </div>
                 </div>
                 
                 <div class="form-group">
                     <label>非加粗文本音色：</label>
-                    <select id="normalVoice">
-                        <optgroup label="👩 女声">
-                            <option value="zh_female_vv_uranus_bigtts" selected>薇薇（温柔女声）</option>
-                            <option value="zh_female_xiaohe_uranus_bigtts">小何（甜美女声）</option>
-                        </optgroup>
-                        <optgroup label="👨 男声">
-                            <option value="zh_male_m191_uranus_bigtts">云舟（沉稳男声）</option>
-                            <option value="zh_male_taocheng_uranus_bigtts">小天（阳光男声）</option>
-                        </optgroup>
-                    </select>
+                    <div class="voice-selector-row">
+                        <select id="normalVoice">
+                            <!-- 音色选项由JavaScript动态生成 -->
+                        </select>
+                        <button class="listen-btn" onclick="playVoicePreview('normalVoice', this)">🔊 试听</button>
+                    </div>
                 </div>
                 
-                <div class="voice-info">
-                    <div>✅ 加粗文本 = 角色1（可选 2男+2女）</div>
-                    <div>✅ 非加粗文本 = 角色2（可选 2女+2男）</div>
-                    <div>✅ 灵活搭配，自由选择音色组合</div>
+                <!-- 多音色模式切换按钮 -->
+                <button class="toggle-multi-voice-btn" onclick="toggleMultiVoiceMode()" id="toggleMultiVoiceBtn">
+                    <span id="toggleIcon">➕</span> 启用多音色模式（支持4种彩色文本音色）
+                </button>
+                
+                <!-- 彩色音色配置面板 -->
+                <div class="color-voice-panel" id="colorVoicePanel">
+                    <div class="color-voice-title">🎨 彩色文本音色配置</div>
+                    
+                    <div class="voice-grid">
+                        <!-- 蓝色音色 -->
+                        <div class="voice-card blue">
+                            <div class="color-label">
+                                <span class="color-dot blue"></span>
+                                蓝色文本音色
+                            </div>
+                            <select id="blueVoice">
+                                <!-- 音色选项由JavaScript动态生成 -->
+                            </select>
+                            <button class="listen-btn" onclick="playVoicePreview('blueVoice', this)">🔊 试听</button>
+                        </div>
+                        
+                        <!-- 红色音色 -->
+                        <div class="voice-card red">
+                            <div class="color-label">
+                                <span class="color-dot red"></span>
+                                红色文本音色
+                            </div>
+                            <select id="redVoice">
+                                <!-- 音色选项由JavaScript动态生成 -->
+                            </select>
+                            <button class="listen-btn" onclick="playVoicePreview('redVoice', this)">🔊 试听</button>
+                        </div>
+                        
+                        <!-- 绿色音色 -->
+                        <div class="voice-card green">
+                            <div class="color-label">
+                                <span class="color-dot green"></span>
+                                绿色文本音色
+                            </div>
+                            <select id="greenVoice">
+                                <!-- 音色选项由JavaScript动态生成 -->
+                            </select>
+                            <button class="listen-btn" onclick="playVoicePreview('greenVoice', this)">🔊 试听</button>
+                        </div>
+                        
+                        <!-- 紫色音色 -->
+                        <div class="voice-card purple">
+                            <div class="color-label">
+                                <span class="color-dot purple"></span>
+                                紫色文本音色
+                            </div>
+                            <select id="purpleVoice">
+                                <!-- 音色选项由JavaScript动态生成 -->
+                            </select>
+                            <button class="listen-btn" onclick="playVoicePreview('purpleVoice', this)">🔊 试听</button>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="voice-info" style="margin-top: 15px;">
+                    <div id="voiceModeInfo">✅ 当前：基础模式（2种音色）</div>
+                    <div>• 黑色普通文本 → 非加粗音色</div>
+                    <div>• 黑色加粗文本 → 加粗音色</div>
                 </div>
             </div>
 
@@ -498,12 +748,248 @@
     </div>
 
     <script>
+        // ==================== 音色数据库（集中管理）====================
+        const VOICE_DATABASE = {
+            male: [
+                {
+                    id: 'zh_male_m191_uranus_bigtts',
+                    name: '云舟',
+                    desc: '沉稳男声',
+                    fullDesc: '沉稳平和成熟男声，温润大叔感',
+                    tags: ['成熟', '温润', '大叔']
+                },
+                {
+                    id: 'zh_male_taocheng_uranus_bigtts',
+                    name: '小天',
+                    desc: '阳光男声',
+                    fullDesc: '阳光开朗少年感男声，青春朝气',
+                    tags: ['青春', '活力', '少年']
+                },
+                {
+                    id: 'zh_male_cixingjieshuonan_uranus_bigtts',
+                    name: '磁性解说',
+                    desc: '磁性解说男声',
+                    fullDesc: '嗓音有胸腔共鸣，大气有穿透力，适合新闻播报',
+                    tags: ['新闻', '播报', '专业']
+                },
+                {
+                    id: 'ICL_uranus_zh_male_ruyacaijun_tob',
+                    name: '儒雅才俊 2.0',
+                    desc: '儒雅大叔',
+                    fullDesc: '稳重儒雅大叔，温润谦虚，待人平和有礼',
+                    tags: ['稳重', '温润', '有礼']
+                }
+            ],
+            female: [
+                {
+                    id: 'zh_female_vv_uranus_bigtts',
+                    name: '薇薇',
+                    desc: '温柔女声',
+                    fullDesc: '活泼灵动青年女声',
+                    tags: ['活泼', '灵动', '青年']
+                },
+                {
+                    id: 'zh_female_xiaohe_uranus_bigtts',
+                    name: '小何',
+                    desc: '甜美女声',
+                    fullDesc: '甜美亲切温柔女声，带一点软萌腔',
+                    tags: ['甜美', '软萌', '亲切']
+                },
+                {
+                    id: 'zh_female_jitangmei_uranus_bigtts',
+                    name: '鸡汤妹妹 2.0',
+                    desc: '治愈甜妹',
+                    fullDesc: '语调温暖、语气治愈，充满正能量的甜妹音',
+                    tags: ['温暖', '治愈', '正能量']
+                },
+                {
+                    id: 'ICL_uranus_zh_female_wenrouwenya_tob',
+                    name: '温柔文雅 2.0',
+                    desc: '儒雅古风',
+                    fullDesc: '儒雅古风大小姐，温婉柔和，举手投足尽显典雅',
+                    tags: ['温婉', '柔和', '典雅']
+                }
+            ]
+        };
+
+        // 动态生成音色选项
+        function generateVoiceOptions(selectId, defaultValue = null) {
+            const select = document.getElementById(selectId);
+            if (!select) {
+                console.warn(`未找到音色下拉框: ${selectId}`);
+                return;
+            }
+            
+            // 清空现有选项
+            select.innerHTML = '';
+            
+            // 添加男声组
+            const maleGroup = document.createElement('optgroup');
+            maleGroup.label = '👨 男声';
+            VOICE_DATABASE.male.forEach(voice => {
+                const option = document.createElement('option');
+                option.value = voice.id;
+                option.textContent = `${voice.name}（${voice.desc}）`;
+                option.setAttribute('data-full-desc', voice.fullDesc);
+                if (defaultValue && voice.id === defaultValue) {
+                    option.selected = true;
+                }
+                maleGroup.appendChild(option);
+            });
+            select.appendChild(maleGroup);
+            
+            // 添加女声组
+            const femaleGroup = document.createElement('optgroup');
+            femaleGroup.label = '👩 女声';
+            VOICE_DATABASE.female.forEach(voice => {
+                const option = document.createElement('option');
+                option.value = voice.id;
+                option.textContent = `${voice.name}（${voice.desc}）`;
+                option.setAttribute('data-full-desc', voice.fullDesc);
+                if (defaultValue && voice.id === defaultValue) {
+                    option.selected = true;
+                }
+                femaleGroup.appendChild(option);
+            });
+            select.appendChild(femaleGroup);
+            
+            console.log(`✅ 音色下拉框已生成: ${selectId} (${VOICE_DATABASE.male.length + VOICE_DATABASE.female.length}个音色)`);
+        }
+
+        // 获取音色信息
+        function getVoiceInfo(voiceId) {
+            const allVoices = [...VOICE_DATABASE.male, ...VOICE_DATABASE.female];
+            return allVoices.find(v => v.id === voiceId);
+        }
+
+        // ==================== 原有变量和函数 ====================
         // 全局变量：保存当前音频 Blob 和格式
         let currentAudioBlob = null;
         let currentAudioFormat = 'mp3';
         let currentFileName = 'document';
         let dialogSegments = []; // 对话片段列表
         let currentPlayingIndex = -1; // 当前播放片段索引
+        let previewAudio = null; // 试听音频对象
+        let isMultiVoiceMode = false; // 是否启用多音色模式
+        
+        // 切换多音色模式
+        function toggleMultiVoiceMode() {
+            isMultiVoiceMode = !isMultiVoiceMode;
+            const panel = document.getElementById('colorVoicePanel');
+            const btn = document.getElementById('toggleMultiVoiceBtn');
+            const icon = document.getElementById('toggleIcon');
+            const modeInfo = document.getElementById('voiceModeInfo');
+            
+            if (isMultiVoiceMode) {
+                panel.classList.add('show');
+                btn.classList.add('active');
+                icon.textContent = '➖';
+                btn.innerHTML = '<span id="toggleIcon">➖</span> 收起多音色模式';
+                modeInfo.textContent = '✅ 当前：多音色模式（6种音色）';
+                
+                // 保存状态
+                localStorage.setItem('multiVoiceMode', 'true');
+                console.log('已启用多音色模式');
+            } else {
+                panel.classList.remove('show');
+                btn.classList.remove('active');
+                icon.textContent = '➕';
+                btn.innerHTML = '<span id="toggleIcon">➕</span> 启用多音色模式（支持4种彩色文本音色）';
+                modeInfo.textContent = '✅ 当前：基础模式（2种音色）';
+                
+                // 保存状态
+                localStorage.setItem('multiVoiceMode', 'false');
+                console.log('已关闭多音色模式');
+            }
+        }
+        
+        // 播放音色试听
+        async function playVoicePreview(selectId, button) {
+            const select = document.getElementById(selectId);
+            const voiceId = select.value;
+            const voiceName = select.options[select.selectedIndex].text;
+            
+            console.log('试听音色:', voiceName, '(', voiceId, ')');
+            
+            // 如果正在播放，停止播放
+            if (previewAudio && !previewAudio.paused) {
+                previewAudio.pause();
+                previewAudio = null;
+                
+                // 恢复所有按钮状态
+                document.querySelectorAll('.listen-btn').forEach(btn => {
+                    btn.classList.remove('playing');
+                    btn.innerHTML = '🔊 试听';
+                });
+                
+                console.log('停止试听');
+                return;
+            }
+            
+            // 更新按钮状态
+            document.querySelectorAll('.listen-btn').forEach(btn => {
+                btn.classList.remove('playing');
+                btn.innerHTML = '🔊 试听';
+            });
+            button.classList.add('playing');
+            button.innerHTML = '⏸️ 停止';
+            
+            try {
+                // 提取音色名称（去掉括号内容）
+                const shortName = voiceName.split('（')[0];
+                const previewText = `你好，我是${shortName}，这是我的声音`;
+                
+                console.log('试听文本:', previewText);
+                
+                // 调用TTS API生成试听音频
+                const response = await fetch('/api/volcengine-tts/synthesize-stream', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        text: previewText,
+                        voiceType: voiceId,
+                        format: 'mp3',
+                        sampleRate: 24000
+                    })
+                });
+                
+                if (!response.ok) {
+                    throw new Error('试听失败: ' + response.statusText);
+                }
+                
+                const blob = await response.blob();
+                const audioUrl = URL.createObjectURL(blob);
+                
+                previewAudio = new Audio(audioUrl);
+                
+                // 播放结束时恢复按钮状态
+                previewAudio.addEventListener('ended', () => {
+                    button.classList.remove('playing');
+                    button.innerHTML = '🔊 试听';
+                    URL.revokeObjectURL(audioUrl);
+                    console.log('试听播放完成');
+                });
+                
+                // 播放错误时恢复按钮状态
+                previewAudio.addEventListener('error', () => {
+                    button.classList.remove('playing');
+                    button.innerHTML = '🔊 试听';
+                    URL.revokeObjectURL(audioUrl);
+                    console.error('试听播放错误');
+                });
+                
+                await previewAudio.play();
+                console.log('开始播放试听音频');
+                
+            } catch (error) {
+                console.error('试听失败:', error);
+                button.classList.remove('playing');
+                button.innerHTML = '🔊 试听';
+                showStatus('试听失败: ' + error.message, 'error');
+            }
+        }
         
         // 显示状态
         function showStatus(message, type) {
@@ -533,6 +1019,12 @@
             const format = document.getElementById('audioFormat').value;
             const sampleRate = document.getElementById('sampleRate').value;
             
+            // 获取彩色音色配置（如果启用了多音色模式）
+            const blueVoice = document.getElementById('blueVoice').value;
+            const redVoice = document.getElementById('redVoice').value;
+            const greenVoice = document.getElementById('greenVoice').value;
+            const purpleVoice = document.getElementById('purpleVoice').value;
+            
             // 保存当前配置
             currentAudioFormat = format;
             currentFileName = file.name.replace('.docx', '');
@@ -541,6 +1033,13 @@
             console.log('- 文件名:', currentFileName);
             console.log('- 格式:', format);
             console.log('- 采样率:', sampleRate);
+            console.log('- 多音色模式:', isMultiVoiceMode);
+            if (isMultiVoiceMode) {
+                console.log('- 蓝色音色:', blueVoice);
+                console.log('- 红色音色:', redVoice);
+                console.log('- 绿色音色:', greenVoice);
+                console.log('- 紫色音色:', purpleVoice);
+            }
             
             const button = event.target;
             button.disabled = true;
@@ -555,6 +1054,18 @@
                 formData.append('normalVoice', normalVoice);
                 formData.append('format', format);
                 formData.append('sampleRate', sampleRate);
+                
+                // 如果启用了多音色模式，传递彩色音色配置
+                if (isMultiVoiceMode) {
+                    formData.append('blueVoice', blueVoice);
+                    formData.append('redVoice', redVoice);
+                    formData.append('greenVoice', greenVoice);
+                    formData.append('purpleVoice', purpleVoice);
+                    formData.append('multiVoiceMode', 'true');
+                    console.log('✅ 已启用多音色模式，传递6种音色配置');
+                } else {
+                    console.log('✅ 基础模式，传递2种音色配置');
+                }
                 
                 // 步骤1：调用JSON接口获取片段信息
                 console.log('步骤1：获取片段信息...');
@@ -589,6 +1100,15 @@
                 formData2.append('normalVoice', normalVoice);
                 formData2.append('format', format);
                 formData2.append('sampleRate', sampleRate);
+                
+                // 如果启用了多音色模式，传递彩色音色配置
+                if (isMultiVoiceMode) {
+                    formData2.append('blueVoice', blueVoice);
+                    formData2.append('redVoice', redVoice);
+                    formData2.append('greenVoice', greenVoice);
+                    formData2.append('purpleVoice', purpleVoice);
+                    formData2.append('multiVoiceMode', 'true');
+                }
                 
                 const streamResponse = await fetch('/api/document-tts/generate-stream', {
                     method: 'POST',
@@ -959,7 +1479,26 @@
         
         // 页面加载时执行
         window.addEventListener('load', () => {
+            console.log('=================================');
             console.log('Word文档对话TTS测试页面加载完成');
+            console.log('=================================');
+            
+            // 初始化所有音色下拉框
+            console.log('开始初始化音色下拉框...');
+            generateVoiceOptions('boldVoice', 'zh_male_m191_uranus_bigtts');
+            generateVoiceOptions('normalVoice', 'zh_female_vv_uranus_bigtts');
+            generateVoiceOptions('blueVoice', 'zh_male_m191_uranus_bigtts');
+            generateVoiceOptions('redVoice', 'zh_female_vv_uranus_bigtts');
+            generateVoiceOptions('greenVoice', 'zh_male_taocheng_uranus_bigtts');
+            generateVoiceOptions('purpleVoice', 'zh_male_m191_uranus_bigtts');
+            console.log('✅ 所有音色下拉框初始化完成');
+            
+            // 恢复多音色模式状态
+            const savedMode = localStorage.getItem('multiVoiceMode');
+            if (savedMode === 'true') {
+                isMultiVoiceMode = false; // 先设为false，再切换
+                toggleMultiVoiceMode(); // 切换到true
+            }
             
             // 添加格式变化提示
             const formatSelect = document.getElementById('audioFormat');
@@ -972,6 +1511,12 @@
             sampleRateSelect.addEventListener('change', (e) => {
                 console.log('采样率切换为: ' + e.target.value + ' Hz');
             });
+            
+            console.log('=================================');
+            console.log('🎤 6音色配置功能已加载');
+            console.log(`📊 音色数据库: ${VOICE_DATABASE.male.length}个男声 + ${VOICE_DATABASE.female.length}个女声`);
+            console.log('✅ 所有音色都支持试听功能');
+            console.log('=================================');
         });
     </script>
 </body>

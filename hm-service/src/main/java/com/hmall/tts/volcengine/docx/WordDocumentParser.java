@@ -32,6 +32,15 @@ public class WordDocumentParser {
      * @throws Exception 解析失败时抛出异常
      */
     public List<TextSegment> parse(InputStream inputStream, VoiceConfig voiceConfig) throws Exception {
+        log.info("==========================================");
+        log.info("🔍 WordDocumentParser.parse() 被调用！");
+        log.info("🔍 multiVoiceMode={}", voiceConfig.isMultiVoiceMode());
+        log.info("🔍 blueVoice={}", voiceConfig.getBlueVoice());
+        log.info("🔍 redVoice={}", voiceConfig.getRedVoice());
+        log.info("🔍 greenVoice={}", voiceConfig.getGreenVoice());
+        log.info("🔍 purpleVoice={}", voiceConfig.getPurpleVoice());
+        log.info("==========================================");
+        
         log.info("开始解析Word文档，音色配置: boldVoice={}, normalVoice={}", 
                 voiceConfig.getBoldVoice(), voiceConfig.getNormalVoice());
         
@@ -70,13 +79,14 @@ public class WordDocumentParser {
                     // 判断是否加粗
                     Boolean isBold = run.isBold();
                     
-                    // 根据是否加粗选择音色
-                    String speaker;
-                    if (isBold != null && isBold) {
-                        speaker = voiceConfig.getBoldVoice();
-                    } else {
-                        speaker = voiceConfig.getNormalVoice();
-                    }
+                    // ✅ 新增：提取文字颜色（RGB格式，例如："0070C0"）
+                    String colorRGB = run.getColor();
+                    
+                    // ✅ 修改：根据颜色和加粗状态选择音色
+                    String speaker = voiceConfig.getVoiceId(
+                        colorRGB, 
+                        isBold != null && isBold
+                    );
                     
                     // 创建文本片段
                     TextSegment segment = TextSegment.builder()
@@ -89,8 +99,8 @@ public class WordDocumentParser {
                     
                     segments.add(segment);
                     
-                    log.debug("解析文本片段: text={}, isBold={}, speaker={}, paragraphId={}", 
-                            text, isBold, speaker, paragraphId);
+                    log.info("🎤 解析文本片段: text='{}', isBold={}, colorRGB={}, speaker={}, paragraphId={}", 
+                            text, isBold, colorRGB, speaker, paragraphId);
                 }
             }
             
