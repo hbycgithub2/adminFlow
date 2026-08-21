@@ -1137,17 +1137,18 @@
                         const realDuration = audio.duration;
                         const estimatedDuration = result.totalDuration;
                         
-                        console.log('=== 时长对比 ===');
-                        console.log('后端估算时长:', estimatedDuration.toFixed(3), '秒');
+                        console.log('=== 音频时长信息 ===');
+                        console.log('后端返回时长:', estimatedDuration.toFixed(3), '秒');
                         console.log('音频真实时长:', realDuration.toFixed(3), '秒');
                         console.log('差异:', (realDuration - estimatedDuration).toFixed(3), '秒');
                         
-                        // 使用真实时长校准片段时间戳
-                        if (Math.abs(realDuration - estimatedDuration) > 0.1) {
-                            console.log('⚠️ 检测到时长差异，开始校准片段时间戳...');
-                            calibrateSegmentTimings(dialogSegments, estimatedDuration, realDuration);
-                            console.log('✅ 片段时间戳校准完成');
-                        }
+                        // ✅ 关键决策：完全不校准，直接使用后端时间戳
+                        // 原因：
+                        // 1. 后端WhisperX返回的时间戳是基于实际音频的（98-99%准确）
+                        // 2. 后端已经处理了停顿（虽然没实际插入静音，但时间轴是连续的）
+                        // 3. 前端校准会破坏后端的精确时间戳
+                        // 4. 只要后端时间戳准确，前端就不需要任何处理
+                        console.log('✅ 使用后端原始时间戳，不进行校准');
                         
                         resolve();
                     }, { once: true });
@@ -1191,47 +1192,33 @@
             console.log('后端估算总时长:', estimatedTotal.toFixed(3), '秒');
             console.log('音频真实时长:', realTotal.toFixed(3), '秒');
             
-            // 【重要】重新计算所有片段的时间，确保不超出音频时长
-            let currentTime = 0;
-            const totalEstimatedDuration = segments.reduce((sum, seg) => sum + seg.duration, 0);
+            // 计算缩放因子
+            const scaleFactor = realTotal / estimatedTotal;
+            console.log('时长缩放因子:', scaleFactor.toFixed(4));
             
-            console.log('所有片段时长累加:', totalEstimatedDuration.toFixed(3), '秒');
-            
-            // 使用真实音频时长重新分配
+            // 按比例缩放所有片段和字符的时间戳（保持相对时长比例）
             segments.forEach((segment, index) => {
-                // 计算该片段在总时长中的占比
-                const proportion = segment.duration / totalEstimatedDuration;
+                // 缩放片段的startTime和duration
+                segment.startTime = segment.startTime * scaleFactor;
+                segment.duration = segment.duration * scaleFactor;
                 
-                // 重新计算该片段的时长
-                const newDuration = realTotal * proportion;
-                
-                // 更新片段时间
-                segment.startTime = currentTime;
-                segment.duration = newDuration;
-                
-                // 校准逐字时间戳
+                // 缩放逐字时间戳（保持每个字符的相对时长比例）
                 if (segment.charTimings && segment.charTimings.length > 0) {
-                    const charCount = segment.charTimings.length;
-                    let charCurrentTime = currentTime;
-                    
                     segment.charTimings.forEach((charTiming, charIndex) => {
-                        // 每个字均分片段时长
-                        const charDuration = newDuration / charCount;
-                        charTiming.startTime = charCurrentTime;
-                        charTiming.duration = charDuration;
-                        charCurrentTime += charDuration;
+                        // ✅ 按比例缩放，保持相对时长
+                        charTiming.startTime = charTiming.startTime * scaleFactor;
+                        charTiming.duration = charTiming.duration * scaleFactor;
                     });
                 }
-                
-                currentTime += newDuration;
             });
             
-            console.log('✅ 校准后的片段时间（保证不超出音频时长）:');
+            console.log('✅ 校准后的片段时间（按比例缩放，保持相对时长）:');
             segments.forEach((seg, i) => {
                 console.log(`  片段${i}: ${seg.startTime.toFixed(3)}s - ${(seg.startTime + seg.duration).toFixed(3)}s (时长${seg.duration.toFixed(3)}s)`);
             });
             
-            console.log('校准后总时长:', currentTime.toFixed(3), '秒（应该 ≈', realTotal.toFixed(3), '秒）');
+            const finalTotal = segments[segments.length - 1].startTime + segments[segments.length - 1].duration;
+            console.log('校准后总时长:', finalTotal.toFixed(3), '秒（目标:', realTotal.toFixed(3), '秒，误差:', Math.abs(finalTotal - realTotal).toFixed(3), '秒）');
         }
         
         // 渲染文档内容预览（逐字拆分 + 智能时长）
@@ -1373,7 +1360,7 @@
             });
         }
         
-        // 第2层：逐字高亮（完全基于整句时长均分，100%跟随整句）
+        // 第2层：逐字高亮（使用后端返回的精确时间戳，100%同步音频）
         function updateCharHighlight(currentTime) {
             // 1. 找到当前播放的句子
             let currentSegmentIndex = -1;
@@ -1411,7 +1398,7 @@
                 return;
             }
             
-            // 3. 【新方案】完全基于整句时长均分计算逐字高亮
+            // 3. 【修复方案】使用后端返回的精确 charTimings 时间戳
             const currentSegmentChars = document.querySelectorAll(`.char[data-segment-index="${currentSegmentIndex}"]`);
             const charCount = currentSegmentChars.length;
             
@@ -1420,17 +1407,47 @@
                 return;
             }
             
-            // 计算当前句子的播放进度（0-1）
-            const segmentProgress = (currentTime - currentSegment.startTime) / currentSegment.duration;
+            // 计算当前应该高亮的字符索引
+            let currentCharIndex = -1;
             
-            // 计算应该高亮到第几个字（向下取整）
-            const currentCharIndex = Math.floor(segmentProgress * charCount);
+            // 优先使用后端返回的精确时间戳
+            if (currentSegment.charTimings && currentSegment.charTimings.length > 0) {
+                // 遍历所有字符，找到当前正在播放的字
+                currentSegment.charTimings.forEach((charTiming, index) => {
+                    const charStartTime = charTiming.startTime;
+                    const charEndTime = charTiming.startTime + charTiming.duration;
+                    
+                    if (currentTime >= charStartTime && currentTime < charEndTime) {
+                        currentCharIndex = index;
+                    }
+                });
+                
+                // 如果没有找到正在播放的字（可能在句子结尾的间隙），找最后一个已播放的字
+                if (currentCharIndex === -1) {
+                    for (let i = currentSegment.charTimings.length - 1; i >= 0; i--) {
+                        if (currentTime >= currentSegment.charTimings[i].startTime) {
+                            currentCharIndex = i;
+                            break;
+                        }
+                    }
+                }
+            } else {
+                // 降级方案：如果没有精确时间戳，才使用均分算法
+                console.warn(`⚠️ 片段${currentSegmentIndex}没有charTimings，使用均分算法（不够精确）`);
+                const segmentProgress = (currentTime - currentSegment.startTime) / currentSegment.duration;
+                currentCharIndex = Math.floor(segmentProgress * charCount);
+            }
             
             // 调试日志（每0.5秒输出一次）
             if (Math.floor(currentTime * 2) !== Math.floor((currentTime - 0.05) * 2)) {
-                console.log(`[逐字高亮] 时间${currentTime.toFixed(2)}s，片段${currentSegmentIndex}，` +
-                           `进度${(segmentProgress*100).toFixed(1)}%，高亮第${currentCharIndex}/${charCount}字，` +
-                           `字符="${currentSegmentChars[currentCharIndex]?.textContent}"`);
+                const currentChar = currentSegmentChars[currentCharIndex];
+                const charStartTime = currentChar ? parseFloat(currentChar.getAttribute('data-start-time')) : null;
+                const charDuration = currentChar ? parseFloat(currentChar.getAttribute('data-duration')) : null;
+                
+                console.log(`[逐字高亮] 时间${currentTime.toFixed(3)}s，片段${currentSegmentIndex}，` +
+                           `高亮第${currentCharIndex}/${charCount}字，` +
+                           `字符="${currentChar?.textContent}"，` +
+                           `精确时间=${charStartTime?.toFixed(3)}s-${(charStartTime + charDuration)?.toFixed(3)}s`);
             }
             
             // 更新所有字的状态

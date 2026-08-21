@@ -45,16 +45,24 @@ public class DocumentTTSController {
             @RequestParam(value = "blueVoice", required = false) String blueVoice,
             @RequestParam(value = "redVoice", required = false) String redVoice,
             @RequestParam(value = "greenVoice", required = false) String greenVoice,
-            @RequestParam(value = "purpleVoice", required = false) String purpleVoice
+            @RequestParam(value = "purpleVoice", required = false) String purpleVoice,
+            // 字幕对齐参数（新增）
+            @RequestParam(value = "alignSubtitles", defaultValue = "true") Boolean alignSubtitles
     ) {
         boolean isMultiVoice = "true".equals(multiVoiceMode);
         
         if (isMultiVoice) {
-            log.info("收到文档TTS请求: 文件={}, 多音色模式=启用, 蓝={}, 红={}, 绿={}, 紫={}", 
-                    file.getOriginalFilename(), blueVoice, redVoice, greenVoice, purpleVoice);
+            log.info("收到文档TTS请求: 文件={}, 多音色模式=启用, 蓝={}, 红={}, 绿={}, 紫={}, 对齐字幕={}", 
+                    file.getOriginalFilename(), blueVoice, redVoice, greenVoice, purpleVoice, alignSubtitles);
+            // ⭐ 诊断日志：详细打印每个音色的完整ID
+            log.info("🎵 音色详情:");
+            log.info("  蓝色音色ID: {}", blueVoice);
+            log.info("  红色音色ID: {} ← 重点检查", redVoice);
+            log.info("  绿色音色ID: {}", greenVoice);
+            log.info("  紫色音色ID: {}", purpleVoice);
         } else {
-            log.info("收到文档TTS请求: 文件={}, 加粗音色={}, 非加粗音色={}", 
-                    file.getOriginalFilename(), boldVoice, normalVoice);
+            log.info("收到文档TTS请求: 文件={}, 加粗音色={}, 非加粗音色={}, 对齐字幕={}", 
+                    file.getOriginalFilename(), boldVoice, normalVoice, alignSubtitles);
         }
         
         try {
@@ -68,6 +76,7 @@ public class DocumentTTSController {
                     .redVoice(redVoice)
                     .greenVoice(greenVoice)
                     .purpleVoice(purpleVoice)
+                    .alignSubtitles(alignSubtitles)  // 新增：字幕对齐开关
                     .build();
             
             DocumentTTSResult result = documentTTSService.generateDocumentSpeech(file, voiceConfig);
@@ -103,7 +112,9 @@ public class DocumentTTSController {
             @RequestParam(value = "blueVoice", required = false) String blueVoice,
             @RequestParam(value = "redVoice", required = false) String redVoice,
             @RequestParam(value = "greenVoice", required = false) String greenVoice,
-            @RequestParam(value = "purpleVoice", required = false) String purpleVoice
+            @RequestParam(value = "purpleVoice", required = false) String purpleVoice,
+            // 字幕对齐参数（新增）
+            @RequestParam(value = "alignSubtitles", defaultValue = "true") Boolean alignSubtitles
     ) {
         boolean isMultiVoice = "true".equals(multiVoiceMode);
         
@@ -125,6 +136,7 @@ public class DocumentTTSController {
                     .redVoice(redVoice)
                     .greenVoice(greenVoice)
                     .purpleVoice(purpleVoice)
+                    .alignSubtitles(alignSubtitles)  // 新增：字幕对齐开关
                     .build();
             
             byte[] audioData = documentTTSService.generateDocumentSpeechBytes(file, voiceConfig);

@@ -1882,11 +1882,26 @@
                 // 多音色配置（使用全局变量 isMultiVoiceMode）
                 formData.append('multiVoiceMode', isMultiVoiceMode);
                 if (isMultiVoiceMode) {
-                    formData.append('blueVoice', document.getElementById('blueVoice').value);
-                    formData.append('redVoice', document.getElementById('redVoice').value);
-                    formData.append('greenVoice', document.getElementById('greenVoice').value);
-                    formData.append('purpleVoice', document.getElementById('purpleVoice').value);
+                    const blueVoice = document.getElementById('blueVoice').value;
+                    const redVoice = document.getElementById('redVoice').value;
+                    const greenVoice = document.getElementById('greenVoice').value;
+                    const purpleVoice = document.getElementById('purpleVoice').value;
+                    
+                    formData.append('blueVoice', blueVoice);
+                    formData.append('redVoice', redVoice);
+                    formData.append('greenVoice', greenVoice);
+                    formData.append('purpleVoice', purpleVoice);
+                    
+                    // ⭐ 诊断日志：打印选择的音色
+                    console.log('🎵 多音色配置:');
+                    console.log('  蓝色音色:', blueVoice);
+                    console.log('  红色音色:', redVoice, '← 检查这个！');
+                    console.log('  绿色音色:', greenVoice);
+                    console.log('  紫色音色:', purpleVoice);
                 }
+                
+                // ⭐ 关键：跳过WhisperX对齐，快速生成音频（8秒 vs 30秒）
+                formData.append('alignSubtitles', 'false');
                 
                 console.log('开始生成音频（自动模式-仅音频）...');
                 
@@ -1992,6 +2007,10 @@
                     formData.append('purpleVoice', purpleVoice);
                     formData.append('multiVoiceMode', 'true');
                     console.log('✅ 已启用多音色模式，传递6种音色配置');
+                    console.log('🎤 蓝色音色:', blueVoice);
+                    console.log('🎤 红色音色:', redVoice);
+                    console.log('🎤 绿色音色:', greenVoice);
+                    console.log('🎤 紫色音色:', purpleVoice);
                 } else {
                     console.log('✅ 基础模式，传递2种音色配置');
                 }

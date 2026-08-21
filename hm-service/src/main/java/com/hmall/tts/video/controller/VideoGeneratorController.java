@@ -105,6 +105,7 @@ public class VideoGeneratorController {
                     .redVoice(redVoice)
                     .greenVoice(greenVoice)
                     .purpleVoice(purpleVoice)
+                    .alignSubtitles(true)  // ⚠️ 关键：生成视频必须对齐字幕！
                     .build();
             
             // 构建请求

@@ -55,8 +55,16 @@ public class DocumentTTSServiceImpl implements DocumentTTSService {
     
     @Override
     public DocumentTTSResult generateDocumentSpeech(MultipartFile file, VoiceConfig voiceConfig) {
-        // 默认不跳过对齐（保持向后兼容）
-        return generateDocumentSpeech(file, voiceConfig, false);
+        // 根据voiceConfig中的alignSubtitles参数决定是否跳过对齐
+        boolean skipAlignment = !Boolean.TRUE.equals(voiceConfig.getAlignSubtitles());
+        
+        if (skipAlignment) {
+            log.info("⚡ 使用快速模式：跳过WhisperX对齐，仅生成音频（预计8秒）");
+        } else {
+            log.info("🎬 使用完整模式：WhisperX对齐生成字幕（预计30秒）");
+        }
+        
+        return generateDocumentSpeech(file, voiceConfig, skipAlignment);
     }
     
     @Override
@@ -108,6 +116,15 @@ public class DocumentTTSServiceImpl implements DocumentTTSService {
     public byte[] generateDocumentSpeechBytes(MultipartFile file, VoiceConfig voiceConfig) throws Exception {
         log.info("开始生成文档TTS音频，文件名: {}", file.getOriginalFilename());
         
+        // 根据voiceConfig中的alignSubtitles参数决定是否跳过对齐
+        boolean skipAlignment = !Boolean.TRUE.equals(voiceConfig.getAlignSubtitles());
+        
+        if (skipAlignment) {
+            log.info("⚡ 使用快速模式：跳过WhisperX对齐");
+        } else {
+            log.info("🎬 使用完整模式：WhisperX对齐");
+        }
+        
         try {
             // 1. 解析Word文档
             log.info("步骤1: 解析Word文档...");
@@ -119,8 +136,8 @@ public class DocumentTTSServiceImpl implements DocumentTTSService {
             
             log.info("解析完成，共{}个文本片段", segments.size());
             
-            // 2. 生成音频并返回结果（默认使用WhisperX对齐）
-            AudioGenerationResult result = generateDocumentSpeechWithTiming(segments, voiceConfig, false);
+            // 2. 生成音频并返回结果
+            AudioGenerationResult result = generateDocumentSpeechWithTiming(segments, voiceConfig, skipAlignment);
             
             return result.getAudioData();
             
@@ -245,22 +262,28 @@ public class DocumentTTSServiceImpl implements DocumentTTSService {
                     .collect(Collectors.joining());
             log.info("[完整对齐] 完整文本长度: {}字符", fullText.length());
             
-            // 步骤3：WhisperX一次性对齐完整音频
+            // 步骤3：WhisperX一次性对齐完整音频（或跳过对齐）
+            if (skipAlignment) {
+                // ⚡ 快速模式：完全跳过WhisperX，直接使用智能估算
+                log.info("[完整对齐] ⚡ 跳过WhisperX对齐（快速音频生成模式），使用智能估算");
+                return buildDialogSegmentsWithEstimation(originalSegments, audioSegments, fullAudio, voiceConfig, true);
+            }
+            
             log.info("[完整对齐] 步骤2: WhisperX对齐完整音频（{}KB）...", fullAudio.length / 1024.0);
             List<com.hmall.tts.whisperx.dto.CharTimestamp> charTimestamps;
             
-            if (!skipAlignment && whisperXService.isAvailable()) {
+            if (whisperXService.isAvailable()) {
                 charTimestamps = whisperXService.align(fullAudio, fullText);
                 
                 if (charTimestamps == null || charTimestamps.isEmpty()) {
                     log.warn("[完整对齐] WhisperX返回空结果，降级到估算方法");
-                    return buildDialogSegmentsWithEstimation(originalSegments, audioSegments, voiceConfig);
+                    return buildDialogSegmentsWithEstimation(originalSegments, audioSegments, fullAudio, voiceConfig, false);
                 }
                 
                 log.info("[完整对齐] ✅ WhisperX对齐成功，共{}个字符时间戳", charTimestamps.size());
             } else {
-                log.warn("[完整对齐] WhisperX不可用或跳过对齐，使用估算方法");
-                return buildDialogSegmentsWithEstimation(originalSegments, audioSegments, voiceConfig);
+                log.warn("[完整对齐] WhisperX不可用，使用估算方法");
+                return buildDialogSegmentsWithEstimation(originalSegments, audioSegments, fullAudio, voiceConfig, false);
             }
             
             // 步骤4：将字符时间戳映射到DialogSegment
@@ -271,7 +294,7 @@ public class DocumentTTSServiceImpl implements DocumentTTSService {
             
         } catch (Exception e) {
             log.error("[完整对齐] 对齐失败，降级到估算方法", e);
-            return buildDialogSegmentsWithEstimation(originalSegments, audioSegments, voiceConfig);
+            return buildDialogSegmentsWithEstimation(originalSegments, audioSegments, fullAudio, voiceConfig, false);
         }
         
         return dialogSegments;
@@ -279,6 +302,10 @@ public class DocumentTTSServiceImpl implements DocumentTTSService {
     
     /**
      * 构建行信息列表
+     * 
+     * 换行规则：
+     * 1. isBold 改变时换行（原有逻辑）
+     * 2. speaker（音色）改变时换行（多音色模式新增）
      */
     private List<LineInfo> buildLineInfos(List<TextSegment> originalSegments) {
         List<LineInfo> lines = new ArrayList<>();
@@ -289,29 +316,48 @@ public class DocumentTTSServiceImpl implements DocumentTTSService {
         for (int i = 0; i < originalSegments.size(); i++) {
             TextSegment segment = originalSegments.get(i);
             
-            // 判断是否需要输出当前行
-            boolean shouldOutput = !segment.getIsBold().equals(currentBold) || i == originalSegments.size() - 1;
+            // ⭐ 关键修复：同时检查 isBold 和 speaker 的变化
+            // 只要有一个改变，就应该输出当前行并开始新行
+            boolean boldChanged = !segment.getIsBold().equals(currentBold);
+            boolean speakerChanged = !segment.getSpeaker().equals(currentSpeaker);
+            boolean isLastSegment = i == originalSegments.size() - 1;
+            
+            boolean shouldOutput = boldChanged || speakerChanged || isLastSegment;
             
             if (shouldOutput) {
-                // 如果是最后一个片段且加粗状态相同，需要添加当前文本
-                if (i == originalSegments.size() - 1 && segment.getIsBold().equals(currentBold)) {
-                    lineText.append(segment.getText());
-                }
-                
-                // 输出当前行
-                String text = lineText.toString().trim();
-                if (!text.isEmpty()) {
-                    lines.add(new LineInfo(text, currentBold, currentSpeaker));
-                }
-                
-                // 开始新行
-                if (i < originalSegments.size() - 1) {
-                    lineText = new StringBuilder();
-                    if (!segment.getIsBold().equals(currentBold)) {
-                        lineText.append(segment.getText());
+                // ⭐ 修复Bug：正确处理最后一个片段
+                if (isLastSegment) {
+                    // 如果是最后一个片段且属性改变了
+                    if (boldChanged || speakerChanged) {
+                        // 先输出当前累积的行（旧属性）
+                        String text = lineText.toString().trim();
+                        if (!text.isEmpty()) {
+                            lines.add(new LineInfo(text, currentBold, currentSpeaker));
+                        }
+                        // 更新属性并开始新行（最后一行）
                         currentBold = segment.getIsBold();
                         currentSpeaker = segment.getSpeaker();
+                        lineText = new StringBuilder();
                     }
+                    // 添加最后一个片段的文本（无论属性是否改变）
+                    lineText.append(segment.getText());
+                    // 输出最后一行
+                    String text = lineText.toString().trim();
+                    if (!text.isEmpty()) {
+                        lines.add(new LineInfo(text, currentBold, currentSpeaker));
+                    }
+                } else {
+                    // 非最后片段：属性改变时换行
+                    // 输出当前行
+                    String text = lineText.toString().trim();
+                    if (!text.isEmpty()) {
+                        lines.add(new LineInfo(text, currentBold, currentSpeaker));
+                    }
+                    // 开始新行
+                    lineText = new StringBuilder();
+                    lineText.append(segment.getText());
+                    currentBold = segment.getIsBold();
+                    currentSpeaker = segment.getSpeaker();
                 }
             } else {
                 lineText.append(segment.getText());
@@ -390,14 +436,22 @@ public class DocumentTTSServiceImpl implements DocumentTTSService {
     
     /**
      * 降级方法：使用估算构建DialogSegment
+     * 
+     * @param skipWhisperX 是否跳过WhisperX对齐（true=完全跳过，用于快速音频生成）
      */
     private List<DialogSegment> buildDialogSegmentsWithEstimation(
             List<TextSegment> originalSegments,
             List<AudioSegment> audioSegments,
-            VoiceConfig voiceConfig) {
+            byte[] finalAudio,
+            VoiceConfig voiceConfig,
+            boolean skipWhisperX) {
         
-        log.info("[估算方法] 使用传统方法构建DialogSegment...");
-        return buildDialogSegments(originalSegments, audioSegments, voiceConfig);
+        if (skipWhisperX) {
+            log.info("[估算方法] ⚡ 快速模式：完全跳过WhisperX，使用智能估算");
+        } else {
+            log.info("[估算方法] 使用传统方法构建DialogSegment（包含WhisperX对齐）...");
+        }
+        return buildDialogSegments(originalSegments, audioSegments, finalAudio, voiceConfig, skipWhisperX);
     }
     
     /**
@@ -413,10 +467,14 @@ public class DocumentTTSServiceImpl implements DocumentTTSService {
      * 1. 优先：WhisperX强制对齐（98-99%准确，完全免费）⭐⭐⭐⭐⭐
      * 2. 回退：智能分配算法（95%准确）
      * 3. 兜底：均匀分配（90%准确）
+     * 
+     * @param skipWhisperX 是否跳过WhisperX对齐（true=快速音频生成，false=视频生成）
      */
     private List<DialogSegment> buildDialogSegments(List<TextSegment> originalSegments, 
                                                    List<AudioSegment> audioSegments,
-                                                   VoiceConfig voiceConfig) {
+                                                   byte[] finalAudio,
+                                                   VoiceConfig voiceConfig,
+                                                   boolean skipWhisperX) {
         List<DialogSegment> dialogSegments = new ArrayList<>();
         double currentTime = 0.0;
         
@@ -425,7 +483,7 @@ public class DocumentTTSServiceImpl implements DocumentTTSService {
         }
         
         // 步骤1：构建行到AudioSegment的映射
-        // 合并策略：连续相同isBold的片段合并为一行
+        // 合并策略：连续相同isBold和相同speaker的片段合并为一行
         List<LineInfo> lines = new ArrayList<>();
         StringBuilder lineText = new StringBuilder();
         Boolean currentBold = originalSegments.get(0).getIsBold();
@@ -434,29 +492,47 @@ public class DocumentTTSServiceImpl implements DocumentTTSService {
         for (int i = 0; i < originalSegments.size(); i++) {
             TextSegment segment = originalSegments.get(i);
             
-            // 判断是否需要输出当前行
-            boolean shouldOutput = !segment.getIsBold().equals(currentBold) || i == originalSegments.size() - 1;
+            // ⭐ 关键修复：同时检查 isBold 和 speaker 的变化
+            boolean boldChanged = !segment.getIsBold().equals(currentBold);
+            boolean speakerChanged = !segment.getSpeaker().equals(currentSpeaker);
+            boolean isLastSegment = i == originalSegments.size() - 1;
+            
+            boolean shouldOutput = boldChanged || speakerChanged || isLastSegment;
             
             if (shouldOutput) {
-                // 如果是最后一个片段且加粗状态相同，需要添加当前文本
-                if (i == originalSegments.size() - 1 && segment.getIsBold().equals(currentBold)) {
-                    lineText.append(segment.getText());
-                }
-                
-                // 输出当前行
-                String text = lineText.toString().trim();
-                if (!text.isEmpty()) {
-                    lines.add(new LineInfo(text, currentBold, currentSpeaker));
-                }
-                
-                // 开始新行
-                if (i < originalSegments.size() - 1) {
-                    lineText = new StringBuilder();
-                    if (!segment.getIsBold().equals(currentBold)) {
-                        lineText.append(segment.getText());
+                // ⭐ 修复Bug：正确处理最后一个片段
+                if (isLastSegment) {
+                    // 如果是最后一个片段且属性改变了
+                    if (boldChanged || speakerChanged) {
+                        // 先输出当前累积的行（旧属性）
+                        String text = lineText.toString().trim();
+                        if (!text.isEmpty()) {
+                            lines.add(new LineInfo(text, currentBold, currentSpeaker));
+                        }
+                        // 更新属性并开始新行（最后一行）
                         currentBold = segment.getIsBold();
                         currentSpeaker = segment.getSpeaker();
+                        lineText = new StringBuilder();
                     }
+                    // 添加最后一个片段的文本（无论属性是否改变）
+                    lineText.append(segment.getText());
+                    // 输出最后一行
+                    String text = lineText.toString().trim();
+                    if (!text.isEmpty()) {
+                        lines.add(new LineInfo(text, currentBold, currentSpeaker));
+                    }
+                } else {
+                    // 非最后片段：属性改变时换行
+                    // 输出当前行
+                    String text = lineText.toString().trim();
+                    if (!text.isEmpty()) {
+                        lines.add(new LineInfo(text, currentBold, currentSpeaker));
+                    }
+                    // 开始新行
+                    lineText = new StringBuilder();
+                    lineText.append(segment.getText());
+                    currentBold = segment.getIsBold();
+                    currentSpeaker = segment.getSpeaker();
                 }
             } else {
                 lineText.append(segment.getText());
@@ -535,6 +611,11 @@ public class DocumentTTSServiceImpl implements DocumentTTSService {
                          line.text.length() > 20 ? line.text.substring(0, 20) + "..." : line.text);
                 actualLineDuration = lineDuration;  // 回退到FFprobe时长
                 charTimings = buildCharTimings(line.text, currentTime, actualLineDuration);
+            } else if (skipWhisperX) {
+                // ⚡ 快速模式：完全跳过WhisperX，直接使用智能算法
+                log.info("[⚡快速模式] 跳过WhisperX对齐，使用智能估算");
+                actualLineDuration = lineDuration;  // 使用FFprobe时长
+                charTimings = buildCharTimings(line.text, currentTime, actualLineDuration);
             } else {
                 // ✅ 核心修复：逐个处理AudioSegment（避免停顿插入问题）
                 double segmentStartTime = currentTime;  // 当前segment的开始时间
@@ -587,14 +668,13 @@ public class DocumentTTSServiceImpl implements DocumentTTSService {
                     segmentStartTime += segmentDuration;
                     actualLineDuration += segmentDuration;  // ← Day 6关键：累加实际语音时长
                     
-                    // 加上停顿时间
+                    // ✅ Day 11关键修复：不累加停顿时长到时间轴
+                    // 原因：SmartPauseCalculator.generateSilence() 返回空数组，实际没有插入静音
+                    // 如果累加停顿，会导致时间轴（37秒）远大于实际音频（18秒），字幕提前出现
                     if (audioSegment.getNeedPause() != null && audioSegment.getNeedPause()) {
                         double pauseSec = (audioSegment.getPauseDuration() != null ? 
                                           audioSegment.getPauseDuration() : 800) / 1000.0;
-                        segmentStartTime += pauseSec;
-                        actualLineDuration += pauseSec;  // ← Day 6关键：累加停顿时长
-                        
-                        log.info("[WhisperX] Segment停顿时长：{}秒", String.format("%.3f", pauseSec));
+                        log.info("[WhisperX] Segment停顿配置：{}秒（不累加到时间轴，因为实际未插入静音）", String.format("%.3f", pauseSec));
                         log.info("[WhisperX] Segment结束后累积时间：{}秒", String.format("%.3f", segmentStartTime));
                     } else {
                         log.info("[WhisperX] Segment无停顿");
@@ -626,6 +706,59 @@ public class DocumentTTSServiceImpl implements DocumentTTSService {
         }
         
         log.info("构建了{}个对话行，总实际时长: {}秒", dialogSegments.size(), String.format("%.2f", currentTime));
+        
+        // ✅ Day 11关键修复：移除Day 10的时间轴校正
+        // 原因：
+        // 1. Day 11已修复根本问题：不累加停顿时长（停顿实际未插入）
+        // 2. currentTime（基于FFprobe精确测量）已经等于实际音频时长
+        // 3. Day 10的校正使用估算方法，可能引入新的误差
+        // 4. 不需要再次校正，时间轴已经准确
+        
+        // 注释掉Day 10的校正逻辑
+        /*
+        double actualTotalDuration = calculateTotalDuration(finalAudio, voiceConfig);
+        if (Math.abs(currentTime - actualTotalDuration) > 0.5) {
+            log.warn("⚠️ [时间轴校正] 检测到时间差异：累积时间={}秒，实际时长={}秒，差异={}秒", 
+                     String.format("%.2f", currentTime),
+                     String.format("%.2f", actualTotalDuration),
+                     String.format("%.2f", Math.abs(currentTime - actualTotalDuration)));
+            
+            double scaleFactor = actualTotalDuration / currentTime;
+            log.info("✅ [时间轴校正] 缩放比例：{}", String.format("%.4f", scaleFactor));
+            
+            double correctedTime = 0;
+            for (DialogSegment segment : dialogSegments) {
+                double originalStart = segment.getStartTime();
+                double originalDuration = segment.getDuration();
+                
+                double correctedStart = correctedTime;
+                double correctedDuration = originalDuration * scaleFactor;
+                
+                segment.setStartTime(correctedStart);
+                segment.setDuration(correctedDuration);
+                
+                if (segment.getCharTimings() != null) {
+                    for (CharTiming charTiming : segment.getCharTimings()) {
+                        charTiming.setStartTime(charTiming.getStartTime() * scaleFactor);
+                        charTiming.setDuration(charTiming.getDuration() * scaleFactor);
+                    }
+                }
+                
+                log.debug("[时间轴校正] Segment[{}]: 原始={}s, 修正后={}s", 
+                          segment.getIndex(),
+                          String.format("%.2f", originalStart),
+                          String.format("%.2f", correctedStart));
+                
+                correctedTime += correctedDuration;
+            }
+            
+            log.info("✅ [时间轴校正] 完成：所有segment时间戳已校正到实际音频时长");
+        } else {
+            log.info("✅ [时间轴校正] 无需校正，时间差异在0.5秒以内");
+        }
+        */
+        
+        log.info("✅ [时间轴] 时间轴构建完成，基于FFprobe精确测量，无需校正");
         
         return dialogSegments;
     }

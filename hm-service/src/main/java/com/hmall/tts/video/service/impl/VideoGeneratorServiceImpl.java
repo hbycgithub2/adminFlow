@@ -52,13 +52,29 @@ public class VideoGeneratorServiceImpl implements VideoGeneratorService {
         String taskId = UUID.randomUUID().toString();
         
         try {
-            // ✅ 修复：构建音色配置
-            VoiceConfig voiceConfig = VoiceConfig.builder()
-                    .boldVoice(request.getBoldVoice())
-                    .normalVoice(request.getNormalVoice())
-                    .format(request.getAudioFormat())
-                    .sampleRate(request.getSampleRate())
-                    .build();
+            // ✅ 修复：构建音色配置（视频生成必须对齐字幕）
+            VoiceConfig voiceConfig = request.getVoiceConfig();  // 使用请求中的VoiceConfig（包含多音色配置）
+            
+            // ⚠️ 强制设置 alignSubtitles=true（视频生成必须对齐字幕）
+            if (voiceConfig == null) {
+                voiceConfig = VoiceConfig.builder()
+                        .boldVoice(request.getBoldVoice())
+                        .normalVoice(request.getNormalVoice())
+                        .format(request.getAudioFormat())
+                        .sampleRate(request.getSampleRate())
+                        .alignSubtitles(true)  // 视频生成必须对齐
+                        .build();
+            } else {
+                // 如果VoiceConfig已存在，强制设置alignSubtitles=true
+                voiceConfig.setAlignSubtitles(true);
+                
+                // ⭐ 修复Bug2：确保视频生成时alignSubtitles=true生效
+                if (!Boolean.TRUE.equals(voiceConfig.getAlignSubtitles())) {
+                    log.warn("[{}] ⚠️ 检测到alignSubtitles=false，视频生成强制改为true", taskId);
+                    voiceConfig.setAlignSubtitles(true);
+                }
+                log.info("[{}] ✅ 确认视频生成模式：alignSubtitles={}", taskId, voiceConfig.getAlignSubtitles());
+            }
             
             // ✅ 修复：调用generateDocumentSpeech一次性获取音频和字幕
             log.info("[{}] 步骤1：调用TTS生成音频和字幕（一次性获取，确保100%同步）", taskId);

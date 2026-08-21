@@ -60,7 +60,7 @@ public class VoiceConfig {
     private String blueVoice;
     
     /**
-     * 红色文本音色（RGB: C00000）
+     * 红色文本音色（RGB: C00000 或 FF0000）
      */
     private String redVoice;
     
@@ -74,6 +74,17 @@ public class VoiceConfig {
      */
     private String purpleVoice;
     
+    // ==================== 字幕对齐控制 ====================
+    
+    /**
+     * 是否需要字幕对齐（WhisperX）
+     * true=生成字符级时间戳（用于视频字幕），耗时约30秒
+     * false=只生成音频文件（用于试听/下载），耗时约8秒
+     * 默认值：true（兼容旧版本）
+     */
+    @Builder.Default
+    private Boolean alignSubtitles = true;
+    
     /**
      * 根据文本颜色和是否加粗获取对应的音色ID
      * 
@@ -86,19 +97,39 @@ public class VoiceConfig {
         if (multiVoiceMode && colorRGB != null && !colorRGB.isEmpty()) {
             String color = colorRGB.toUpperCase();
             
+            // ⭐ 诊断日志：打印颜色匹配过程
+            System.out.println(String.format("[VoiceConfig] 颜色匹配: colorRGB=%s, isBold=%s, multiVoiceMode=%s", 
+                                            colorRGB, isBold, multiVoiceMode));
+            System.out.println(String.format("[VoiceConfig] 可用音色: blue=%s, red=%s, green=%s, purple=%s", 
+                                            blueVoice != null ? "✓" : "✗", 
+                                            redVoice != null ? "✓" : "✗",
+                                            greenVoice != null ? "✓" : "✗",
+                                            purpleVoice != null ? "✓" : "✗"));
+            
             // 匹配彩色音色（优先使用颜色音色，如果颜色音色为null则降级到加粗/非加粗）
             if ("0070C0".equals(color) && blueVoice != null) {
+                System.out.println("[VoiceConfig] ✅ 匹配蓝色音色: " + blueVoice);
                 return blueVoice;
-            } else if ("C00000".equals(color) && redVoice != null) {
+            } else if (("C00000".equals(color) || "FF0000".equals(color)) && redVoice != null) {
+                // 支持两种常见的红色：C00000（深红）和 FF0000（纯红）
+                System.out.println("[VoiceConfig] ✅ 匹配红色音色: " + redVoice);
                 return redVoice;
             } else if ("00B050".equals(color) && greenVoice != null) {
+                System.out.println("[VoiceConfig] ✅ 匹配绿色音色: " + greenVoice);
                 return greenVoice;
             } else if ("7030A0".equals(color) && purpleVoice != null) {
+                System.out.println("[VoiceConfig] ✅ 匹配紫色音色: " + purpleVoice);
                 return purpleVoice;
+            } else {
+                System.out.println(String.format("[VoiceConfig] ⚠️ 颜色不匹配或音色为null，降级到基础模式 (color=%s)", color));
             }
+        } else {
+            System.out.println(String.format("[VoiceConfig] 基础模式: multiVoiceMode=%s, colorRGB=%s", multiVoiceMode, colorRGB));
         }
         
         // 降级到基础模式（根据是否加粗）
-        return isBold ? boldVoice : normalVoice;
+        String fallbackVoice = isBold ? boldVoice : normalVoice;
+        System.out.println(String.format("[VoiceConfig] 返回基础音色: isBold=%s, voice=%s", isBold, fallbackVoice));
+        return fallbackVoice;
     }
 }
